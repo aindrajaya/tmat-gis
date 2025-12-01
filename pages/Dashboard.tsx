@@ -139,6 +139,12 @@ const Dashboard: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       
+      {/* Map Section */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold text-slate-800">{t('dashboard:map.stationDistribution')}</h2>
+        <DashboardMap devices={filteredDevices} />
+      </section>
+
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -167,12 +173,6 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {/* Map Section */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-bold text-slate-800">{t('dashboard:map.stationDistribution')}</h2>
-        <DashboardMap devices={filteredDevices} />
-      </section>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

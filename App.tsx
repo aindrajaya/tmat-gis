@@ -10,40 +10,51 @@ import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import { FilterProvider } from './context/FilterContext';
 import { AuthProvider } from './context/AuthContext';
+import { SidebarProvider, useSidebar } from './context/SidebarContext';
+
+const LayoutContent: React.FC = () => {
+  const { isCollapsed } = useSidebar();
+
+  return (
+    <div className="flex h-screen bg-slate-50">
+      <Sidebar />
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-64'}`}>
+        <Header />
+        <main className="flex-1 overflow-y-auto">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/raw-data" element={<RawData />} />
+            <Route path="/master/device" element={<DeviceForm />} />
+            <Route path="/master/company" element={<Companies />} />
+            {/* Placeholders for other routes */}
+            <Route path="*" element={<div className="p-10 text-slate-400">Not implemented in this demo</div>} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <FilterProvider>
-        <Router>
-          <Routes>
-            {/* Public Route */}
-            <Route path="/login" element={<Login />} />
-            
-            {/* Protected Routes */}
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <div className="flex h-screen bg-slate-50">
-                  <Sidebar />
-                  <div className="flex-1 flex flex-col ml-64">
-                    <Header />
-                    <main className="flex-1 overflow-y-auto">
-                      <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/raw-data" element={<RawData />} />
-                        <Route path="/master/device" element={<DeviceForm />} />
-                        <Route path="/master/company" element={<Companies />} />
-                        {/* Placeholders for other routes */}
-                        <Route path="*" element={<div className="p-10 text-slate-400">Not implemented in this demo</div>} />
-                      </Routes>
-                    </main>
-                  </div>
-                </div>
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </Router>
-      </FilterProvider>
+      <SidebarProvider>
+        <FilterProvider>
+          <Router>
+            <Routes>
+              {/* Public Route */}
+              <Route path="/login" element={<Login />} />
+              
+              {/* Protected Routes */}
+              <Route path="/*" element={
+                <ProtectedRoute>
+                  <LayoutContent />
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </Router>
+        </FilterProvider>
+      </SidebarProvider>
     </AuthProvider>
   );
 };

@@ -113,70 +113,59 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({
   return (
     <div className="absolute bottom-16 right-4 z-[1000] bg-white rounded-lg shadow-lg">
       {isOpen && (
-        <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100">
-            <h3 className="font-bold text-slate-800 text-sm">
+        <div className="p-3 space-y-2 max-w-[240px]">
+          <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+            <h3 className="font-bold text-slate-800 text-xs">
               {isIndonesian ? 'Status Ketinggian Air' : 'Water Level Status'}
             </h3>
+            <button
+              onClick={onToggle}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+              title={isIndonesian ? 'Tutup' : 'Close'}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <div className="flex items-start gap-3">
-            <div className="w-4 h-4 rounded-full bg-[#10b981] mt-0.5 flex-shrink-0"></div>
-            <div>
-              <p className="font-semibold text-slate-700 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#10b981] flex-shrink-0"></div>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-700 text-xs">
                 {isIndonesian ? 'Aman' : 'Safe'}
               </p>
-              <p className="text-xs text-slate-500">TMAT ≥ -0.2</p>
-              <p className="text-xs text-slate-600">
-                {isIndonesian ? 'Tingkat air normal' : 'Normal water level'}
-              </p>
+              <p className="text-[10px] text-slate-500">TMAT ≥ -0.2</p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <div className="w-4 h-4 rounded-full bg-[#f59e0b] mt-0.5 flex-shrink-0"></div>
-            <div>
-              <p className="font-semibold text-slate-700 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#f59e0b] flex-shrink-0"></div>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-700 text-xs">
                 {isIndonesian ? 'Peringatan' : 'Warning'}
               </p>
-              <p className="text-xs text-slate-500">-0.4 ≤ TMAT &lt; -0.2</p>
-              <p className="text-xs text-slate-600">
-                {isIndonesian ? 'Perlu perhatian' : 'Needs attention'}
-              </p>
+              <p className="text-[10px] text-slate-500">-0.4 ≤ TMAT &lt; -0.2</p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <div className="w-4 h-4 rounded-full bg-[#f97316] mt-0.5 flex-shrink-0"></div>
-            <div>
-              <p className="font-semibold text-slate-700 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#f97316] flex-shrink-0"></div>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-700 text-xs">
                 {isIndonesian ? 'Bahaya' : 'Danger'}
               </p>
-              <p className="text-xs text-slate-500">-0.6 ≤ TMAT &lt; -0.4</p>
-              <p className="text-xs text-slate-600">
-                {isIndonesian ? 'Tingkat air tinggi' : 'High water level'}
-              </p>
+              <p className="text-[10px] text-slate-500">-0.6 ≤ TMAT &lt; -0.4</p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3">
-            <div className="w-4 h-4 rounded-full bg-[#ef4444] mt-0.5 flex-shrink-0"></div>
-            <div>
-              <p className="font-semibold text-slate-700 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#ef4444] flex-shrink-0"></div>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-700 text-xs">
                 {isIndonesian ? 'Kritis' : 'Critical'}
               </p>
-              <p className="text-xs text-slate-500">TMAT &lt; -0.6</p>
-              <p className="text-xs text-slate-600">
-                {isIndonesian ? 'Tingkat air sangat tinggi' : 'Very high water level'}
-              </p>
+              <p className="text-[10px] text-slate-500">TMAT &lt; -0.6</p>
             </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-100">
-            <p className="text-xs text-slate-500 italic">
-              {isIndonesian 
-                ? 'Ketinggian air dipantau secara terus-menerus dan diperbarui secara real-time'
-                : 'Water levels are continuously monitored and updated in real-time'}
-            </p>
           </div>
         </div>
       )}
@@ -190,7 +179,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(undefined);
   const { filters } = useFilters();
   
-  const [legendOpen, setLegendOpen] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);

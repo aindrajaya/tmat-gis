@@ -1,10 +1,51 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { Delaunay } from 'd3-delaunay';
 import { Device, RealtimeData } from '../types';
 import { useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
+
+// Voronoi tessellation using d3-delaunay (efficient implementation)
+const createVoronoiPolygons = (devices: Device[], bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
+  if (devices.length === 0) return [];
+  if (devices.length === 1) {
+    // Single device - create bounding box
+    return [{
+      device: devices[0],
+      polygon: [
+        [bounds.minLat, bounds.minLng],
+        [bounds.minLat, bounds.maxLng],
+        [bounds.maxLat, bounds.maxLng],
+        [bounds.maxLat, bounds.minLng],
+      ] as [number, number][]
+    }];
+  }
+  
+  // Prepare points for Delaunay triangulation
+  const points: [number, number][] = devices.map(d => [d.longitude, d.latitude]);
+  
+  // Create Delaunay triangulation
+  const delaunay = Delaunay.from(points);
+  
+  // Create Voronoi diagram
+  const voronoi = delaunay.voronoi([bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat]);
+  
+  // Extract polygons for each device
+  const voronoiPolygons: Array<{ device: Device; polygon: [number, number][] }> = [];
+  
+  devices.forEach((device, index) => {
+    const cell = voronoi.cellPolygon(index);
+    if (cell) {
+      // Convert from [lng, lat] to [lat, lng] for Leaflet
+      const polygon = cell.map(([lng, lat]) => [lat, lng] as [number, number]);
+      voronoiPolygons.push({ device, polygon });
+    }
+  });
+  
+  return voronoiPolygons;
+};
 
 // Custom water droplet marker icon with device count
 const createWaterDropletIcon = (color: string = '#3b82f6', count?: number) => {
@@ -229,6 +270,80 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
     return map;
   }, [realtimeData]);
 
+  // Create Voronoi polygons for each device
+  const voronoiPolygons = useMemo(() => {
+    if (filteredDevices.length === 0) return [];
+    
+    // Calculate bounds from devices with tighter constraints
+    const lats = filteredDevices.map(d => d.latitude);
+    const lngs = filteredDevices.map(d => d.longitude);
+    
+    // Calculate center point
+    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+    
+    // Calculate average distance between devices
+    let totalDist = 0;
+    let count = 0;
+    for (let i = 0; i < filteredDevices.length; i++) {
+      for (let j = i + 1; j < filteredDevices.length; j++) {
+        const dist = Math.sqrt(
+          Math.pow(filteredDevices[i].latitude - filteredDevices[j].latitude, 2) +
+          Math.pow(filteredDevices[i].longitude - filteredDevices[j].longitude, 2)
+        );
+        totalDist += dist;
+        count++;
+      }
+    }
+    const avgDist = count > 0 ? totalDist / count : 1;
+    
+    // Use dynamic padding based on device density, with max limit
+    const padding = Math.min(avgDist * 1.5, 1.0); // Maximum 1 degree padding
+    
+    const bounds = {
+      minLat: Math.min(...lats) - padding,
+      maxLat: Math.max(...lats) + padding,
+      minLng: Math.min(...lngs) - padding,
+      maxLng: Math.max(...lngs) + padding,
+    };
+    
+    // Generate Voronoi polygons
+    const voronoi = createVoronoiPolygons(filteredDevices, bounds);
+    
+    // Attach realtime data and status to each polygon, with size constraint
+    return voronoi.map(({ device, polygon }) => {
+      const rtData = deviceDataMap.get(device.device_id_unik);
+      if (!rtData) return null;
+
+      const status = getWaterLevelStatus(rtData.tmat_value);
+      
+      // Clip polygon to reasonable size (max 0.005 degrees from device center)
+      const maxRadius = 0.005;
+      const clippedPolygon = polygon.map(([lat, lng]) => {
+        const distLat = lat - device.latitude;
+        const distLng = lng - device.longitude;
+        const dist = Math.sqrt(distLat * distLat + distLng * distLng);
+        
+        if (dist > maxRadius) {
+          // Scale back to max radius
+          const scale = maxRadius / dist;
+          return [
+            device.latitude + distLat * scale,
+            device.longitude + distLng * scale
+          ] as [number, number];
+        }
+        return [lat, lng] as [number, number];
+      });
+
+      return {
+        device,
+        rtData,
+        status,
+        polygonCoords: clippedPolygon
+      };
+    }).filter(Boolean);
+  }, [filteredDevices, deviceDataMap]);
+
   // Group devices by location (using lat/lng rounded to 3 decimals for clustering)
   const deviceGroups = useMemo(() => {
     const groups = new Map<string, Device[]>();
@@ -294,28 +409,23 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
         
         <MapBoundsHandler devices={filteredDevices} />
         
-        {/* Render heat zones as circle markers - Water Level Status Circles */}
-        {!realtimeLoading && filteredDevices.map((device) => {
-          const rtData = deviceDataMap.get(device.device_id_unik);
-          if (!rtData) {
-            console.log('[DashboardMap] No realtime data for device:', device.device_id_unik);
-            return null;
-          }
-
-          const status = getWaterLevelStatus(rtData.tmat_value);
-          console.log('[DashboardMap] Rendering circle for:', device.device_id_unik, 'status:', status.level);
+        {/* Render Voronoi Polygons - Water Level Zones */}
+        {!realtimeLoading && voronoiPolygons.map((data, index) => {
+          if (!data) return null;
+          const { device, rtData, status, polygonCoords } = data;
+          
+          console.log('[DashboardMap] Rendering polygon for:', device.device_id_unik, 'status:', status.level);
           
           return (
-            <CircleMarker
-              key={device.id}
-              center={[device.latitude, device.longitude]}
-              radius={15}
+            <Polygon
+              key={`polygon-${device.id}`}
+              positions={polygonCoords as any}
               pathOptions={{
                 fillColor: status.color,
-                fillOpacity: 0.6,
+                fillOpacity: 0.4,
                 color: status.color,
                 weight: 2,
-                opacity: 0.8
+                opacity: 0.7
               }}
               eventHandlers={{
                 click: () => setSelectedDevice(device.device_id_unik)
@@ -387,7 +497,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
                   </div>
                 </div>
               </Popup>
-            </CircleMarker>
+            </Polygon>
           );
         })}
 

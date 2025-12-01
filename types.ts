@@ -3,8 +3,12 @@ export interface Perusahaan {
   nama_perusahaan: string;
   kode_perusahaan: string;
   jenis_perusahaan: 'PBPH' | 'Perkebunan';
+  pic_kontak: string;
+  email_kontak: string;
+  telepon: string;
   alamat: string;
   status: string;
+  created_at: string;
 }
 
 export interface Device {

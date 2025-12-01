@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
 import DeviceForm from './pages/DeviceForm';
 import RawData from './pages/RawData';
+import Companies from './pages/Companies';
 import { FilterProvider } from './context/FilterContext';
 
 const App: React.FC = () => {
@@ -20,6 +21,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/raw-data" element={<RawData />} />
                 <Route path="/master/device" element={<DeviceForm />} />
+                <Route path="/master/company" element={<Companies />} />
                 {/* Placeholders for other routes */}
                 <Route path="*" element={<div className="p-10 text-slate-400">Not implemented in this demo</div>} />
               </Routes>

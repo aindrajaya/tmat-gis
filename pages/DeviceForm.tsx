@@ -24,6 +24,7 @@ const DeviceForm: React.FC = () => {
   const { t } = useTranslation();
   const { data: devices, loading, error, refetch } = useDevices();
   const [expandedDeviceId, setExpandedDeviceId] = useState<number | null>(null);
+  const [isFormVisible, setIsFormVisible] = useState(false);
   
   const [formData, setFormData] = useState({
     deviceId: '',
@@ -53,9 +54,41 @@ const DeviceForm: React.FC = () => {
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-800 mb-6">{t('forms:deviceForm.title')}</h1>
       
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      {/* Collapsible Form Header */}
+      <div 
+        className="bg-white rounded-xl shadow-sm border border-slate-200 mb-4 cursor-pointer hover:bg-slate-50 transition-colors"
+        onClick={() => setIsFormVisible(!isFormVisible)}
+      >
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Device Registration Form</h2>
+              <p className="text-xs text-slate-500">Add new device to the monitoring system</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
+              🚧 Under Development
+            </span>
+            {isFormVisible ? (
+              <ChevronUp className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Collapsible Form Content */}
+      {isFormVisible && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 animate-in slide-in-from-top-2">
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column: Inputs */}
           <div className="space-y-4">
             <div>
@@ -63,10 +96,11 @@ const DeviceForm: React.FC = () => {
               <input 
                 type="text" 
                 name="deviceId"
-                className="w-full border border-slate-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50 cursor-not-allowed"
                 value={formData.deviceId}
                 onChange={handleTextChange}
                 placeholder={t('forms:deviceForm.deviceIdPlaceholder')}
+                disabled
               />
             </div>
 
@@ -76,9 +110,10 @@ const DeviceForm: React.FC = () => {
                 <input 
                   type="text" 
                   name="kodeTitik"
-                  className="w-full border border-slate-300 rounded-md px-3 py-2"
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 bg-slate-50 cursor-not-allowed"
                   value={formData.kodeTitik}
                   onChange={handleTextChange}
+                  disabled
                 />
               </div>
               <div>
@@ -86,9 +121,10 @@ const DeviceForm: React.FC = () => {
                 <input 
                   type="text" 
                   name="kodeBlok"
-                  className="w-full border border-slate-300 rounded-md px-3 py-2"
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 bg-slate-50 cursor-not-allowed"
                   value={formData.kodeBlok}
                   onChange={handleTextChange}
+                  disabled
                 />
               </div>
             </div>
@@ -102,9 +138,10 @@ const DeviceForm: React.FC = () => {
                     type="number" 
                     name="lat"
                     step="0.0001"
-                    className="w-full border border-blue-200 rounded-md px-2 py-1.5 text-sm"
+                    className="w-full border border-blue-200 rounded-md px-2 py-1.5 text-sm bg-blue-50 cursor-not-allowed"
                     value={formData.lat}
                     onChange={handleCoordChange}
+                    disabled
                   />
                 </div>
                 <div>
@@ -113,9 +150,10 @@ const DeviceForm: React.FC = () => {
                     type="number" 
                     name="lng"
                     step="0.0001"
-                    className="w-full border border-blue-200 rounded-md px-2 py-1.5 text-sm"
+                    className="w-full border border-blue-200 rounded-md px-2 py-1.5 text-sm bg-blue-50 cursor-not-allowed"
                     value={formData.lng}
                     onChange={handleCoordChange}
+                    disabled
                   />
                 </div>
               </div>
@@ -130,9 +168,10 @@ const DeviceForm: React.FC = () => {
                 <label className="block text-xs text-slate-500 mb-1">{t('forms:deviceForm.provinsi')}</label>
                 <select 
                   name="provinsi"
-                  className="w-full border border-slate-300 rounded-md px-3 py-2 bg-white"
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 bg-slate-50 cursor-not-allowed"
                   value={formData.provinsi}
                   onChange={handleTextChange}
+                  disabled
                 >
                   <option value="">{t('forms:deviceForm.provinceSelect')}</option>
                   <option value="Jawa Timur">Jawa Timur</option>
@@ -145,9 +184,10 @@ const DeviceForm: React.FC = () => {
                 <label className="block text-xs text-slate-500 mb-1">{t('forms:deviceForm.kabupaten')}</label>
                 <select 
                   name="kabupaten"
-                  className="w-full border border-slate-300 rounded-md px-3 py-2 bg-white"
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 bg-slate-50 cursor-not-allowed"
                   value={formData.kabupaten}
                   onChange={handleTextChange}
+                  disabled
                 >
                   <option value="">{t('forms:deviceForm.citySelect')}</option>
                   <option value="Surabaya">Surabaya</option>
@@ -182,13 +222,14 @@ const DeviceForm: React.FC = () => {
         </div>
 
         <div className="mt-8 flex justify-end space-x-3">
-          <button className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-md">{t('common:buttons.cancel')}</button>
-          <button className="px-6 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 shadow-md">
+          <button className="px-4 py-2 text-slate-400 bg-slate-100 rounded-md cursor-not-allowed" disabled>{t('common:buttons.cancel')}</button>
+          <button className="px-6 py-2 bg-slate-400 text-white rounded-md shadow-md cursor-not-allowed" disabled>
             {t('common:buttons.save')}
           </button>
         </div>
 
-      </div>
+        </div>
+      )}
 
       {/* Device List Table */}
       <div className="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

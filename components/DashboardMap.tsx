@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Device, RealtimeData } from '../types';
 import { useRealtimeAll } from '../services/useApi';
+import { useFilters } from '../context/FilterContext';
 
-// Custom water droplet marker icon
-const createWaterDropletIcon = (color: string = '#3b82f6') => {
+// Custom water droplet marker icon with device count
+const createWaterDropletIcon = (color: string = '#3b82f6', count?: number) => {
   const svgIcon = `
     <svg width="32" height="40" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -27,8 +28,13 @@ const createWaterDropletIcon = (color: string = '#3b82f6') => {
             stroke="white" 
             stroke-width="2" 
             filter="url(#shadow)"/>
-      <circle cx="20" cy="20" r="3" fill="white" opacity="0.4"/>
-      <circle cx="12" cy="24" r="2" fill="white" opacity="0.3"/>
+      ${count && count > 1 ? `
+        <circle cx="16" cy="20" r="8" fill="white" opacity="0.9"/>
+        <text x="16" y="24" text-anchor="middle" font-size="10" font-weight="bold" fill="${color}">${count}</text>
+      ` : `
+        <circle cx="20" cy="20" r="3" fill="white" opacity="0.4"/>
+        <circle cx="12" cy="24" r="2" fill="white" opacity="0.3"/>
+      `}
     </svg>
   `;
   
@@ -40,8 +46,6 @@ const createWaterDropletIcon = (color: string = '#3b82f6') => {
     popupAnchor: [0, -40],
   });
 };
-
-const icon = createWaterDropletIcon('#06b6d4');
 
 // Water level status classification based on TMAT values
 // TMAT value indicates water level depth (negative = below surface)
@@ -168,6 +172,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(undefined);
+  const { filters } = useFilters();
   
   const [legendOpen, setLegendOpen] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
@@ -175,23 +180,76 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   // Center on Indonesia roughly
   const center: [number, number] = [-2.5489, 118.0149];
 
+  // Apply filters to devices
+  const filteredDevices = useMemo(() => {
+    return devices.filter(device => {
+      if (filters.provinsi && device.provinsi !== filters.provinsi) return false;
+      if (filters.kabupaten && device.kabupaten !== filters.kabupaten) return false;
+      if (filters.jenisPerusahaan && device.id_perusahaan.toString() !== filters.jenisPerusahaan) return false;
+      return true;
+    });
+  }, [devices, filters]);
+
   // Debug logging
   useEffect(() => {
     console.log('[DashboardMap] Devices:', devices?.length);
+    console.log('[DashboardMap] Filtered devices:', filteredDevices?.length);
     console.log('[DashboardMap] Realtime data:', realtimeData?.length);
     console.log('[DashboardMap] Loading:', realtimeLoading);
-  }, [devices, realtimeData, realtimeLoading]);
+  }, [devices, filteredDevices, realtimeData, realtimeLoading]);
 
   // Create a map of device -> latest realtime data
-  const deviceDataMap = new Map<string, RealtimeData>();
-  if (realtimeData) {
-    realtimeData.forEach(data => {
-      const existing = deviceDataMap.get(data.device_id_unik);
-      if (!existing || new Date(data.timestamp_data) > new Date(existing.timestamp_data)) {
-        deviceDataMap.set(data.device_id_unik, data);
+  const deviceDataMap = useMemo(() => {
+    const map = new Map<string, RealtimeData>();
+    if (realtimeData) {
+      realtimeData.forEach(data => {
+        const existing = map.get(data.device_id_unik);
+        if (!existing || new Date(data.timestamp_data) > new Date(existing.timestamp_data)) {
+          map.set(data.device_id_unik, data);
+        }
+      });
+    }
+    return map;
+  }, [realtimeData]);
+
+  // Group devices by location (using lat/lng rounded to 3 decimals for clustering)
+  const deviceGroups = useMemo(() => {
+    const groups = new Map<string, Device[]>();
+    filteredDevices.forEach(device => {
+      const key = `${device.latitude.toFixed(3)},${device.longitude.toFixed(3)}`;
+      if (!groups.has(key)) {
+        groups.set(key, []);
       }
+      groups.get(key)!.push(device);
     });
-  }
+    return groups;
+  }, [filteredDevices]);
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const statusCounts = {
+      safe: 0,
+      warning: 0,
+      danger: 0,
+      critical: 0,
+      offline: 0
+    };
+
+    filteredDevices.forEach(device => {
+      const rtData = deviceDataMap.get(device.device_id_unik);
+      if (!rtData) {
+        statusCounts.offline++;
+        return;
+      }
+      const status = getWaterLevelStatus(rtData.tmat_value);
+      statusCounts[status.severity as keyof typeof statusCounts]++;
+    });
+
+    return {
+      total: filteredDevices.length,
+      ...statusCounts
+    };
+  }, [filteredDevices, deviceDataMap]);
 
   return (
     <div className="h-[500px] w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative">
@@ -213,7 +271,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
         />
         
         {/* Render heat zones as circle markers */}
-        {devices.map((device) => {
+        {filteredDevices.map((device) => {
           const rtData = deviceDataMap.get(device.device_id_unik);
           if (!rtData) {
             console.log('[DashboardMap] No realtime data for device:', device.device_id_unik);
@@ -309,15 +367,165 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
           );
         })}
 
-        {/* Render device markers on top */}
-        {devices.map((device) => (
-          <Marker 
-            key={`marker-${device.id}`}
-            position={[device.latitude, device.longitude]} 
-            icon={icon}
-          />
-        ))}
+        {/* Render grouped device markers on top */}
+        {Array.from(deviceGroups.entries()).map(([locationKey, groupDevices]) => {
+          const firstDevice = groupDevices[0];
+          const deviceCount = groupDevices.length;
+          
+          // Get the most critical status in the group
+          let mostCriticalColor = '#06b6d4';
+          groupDevices.forEach(device => {
+            const rtData = deviceDataMap.get(device.device_id_unik);
+            if (rtData) {
+              const status = getWaterLevelStatus(rtData.tmat_value);
+              if (status.severity === 'critical') mostCriticalColor = '#ef4444';
+              else if (status.severity === 'danger' && mostCriticalColor !== '#ef4444') mostCriticalColor = '#f97316';
+              else if (status.severity === 'warning' && mostCriticalColor === '#06b6d4') mostCriticalColor = '#f59e0b';
+            }
+          });
+
+          return (
+            <Marker 
+              key={`marker-${locationKey}`}
+              position={[firstDevice.latitude, firstDevice.longitude]} 
+              icon={createWaterDropletIcon(mostCriticalColor, deviceCount)}
+            >
+              {deviceCount > 1 && (
+                <Popup maxWidth={320} minWidth={280}>
+                  <div className="p-2">
+                    <h3 className="font-bold text-slate-800 text-sm mb-2">
+                      {isIndonesian ? 'Grup Perangkat' : 'Device Group'}
+                    </h3>
+                    <p className="text-xs text-slate-600 mb-3">
+                      {firstDevice.kota}, {firstDevice.provinsi}
+                    </p>
+                    <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <p className="text-xs text-emerald-700 font-semibold">
+                        {deviceCount} {isIndonesian ? 'perangkat di lokasi ini' : 'devices at this location'}
+                      </p>
+                    </div>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {groupDevices.map(device => {
+                        const rtData = deviceDataMap.get(device.device_id_unik);
+                        const status = rtData ? getWaterLevelStatus(rtData.tmat_value) : null;
+                        return (
+                          <div key={device.id} className="flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-slate-100 transition-colors">
+                            <span className="text-xs font-medium text-slate-700">{device.device_id_unik}</span>
+                            {status && (
+                              <div 
+                                className="text-xs px-2 py-0.5 rounded-full font-medium"
+                                style={{ 
+                                  backgroundColor: `${status.color}20`, 
+                                  color: status.color 
+                                }}
+                              >
+                                {status.level}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </Popup>
+              )}
+            </Marker>
+          );
+        })}
       </MapContainer>
+
+      {/* Statistics Info Panel */}
+      <div className="absolute top-4 left-4 z-[1000] bg-white rounded-lg shadow-lg p-4 min-w-[280px]">
+        <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100">
+          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            {isIndonesian ? 'Statistik Perangkat' : 'Device Statistics'}
+          </h3>
+          <span className="text-xl font-bold text-emerald-600">{stats.total}</span>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+              <span className="text-xs font-medium text-slate-700">
+                {isIndonesian ? 'Aman' : 'Safe'}
+              </span>
+            </div>
+            <span className="text-sm font-bold text-green-700">{stats.safe}</span>
+          </div>
+
+          <div className="flex items-center justify-between p-2 bg-amber-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#f59e0b]"></div>
+              <span className="text-xs font-medium text-slate-700">
+                {isIndonesian ? 'Peringatan' : 'Warning'}
+              </span>
+            </div>
+            <span className="text-sm font-bold text-amber-700">{stats.warning}</span>
+          </div>
+
+          <div className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#f97316]"></div>
+              <span className="text-xs font-medium text-slate-700">
+                {isIndonesian ? 'Bahaya' : 'Danger'}
+              </span>
+            </div>
+            <span className="text-sm font-bold text-orange-700">{stats.danger}</span>
+          </div>
+
+          <div className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
+              <span className="text-xs font-medium text-slate-700">
+                {isIndonesian ? 'Kritis' : 'Critical'}
+              </span>
+            </div>
+            <span className="text-sm font-bold text-red-700">{stats.critical}</span>
+          </div>
+
+          {stats.offline > 0 && (
+            <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-slate-400"></div>
+                <span className="text-xs font-medium text-slate-700">
+                  {isIndonesian ? 'Offline' : 'Offline'}
+                </span>
+              </div>
+              <span className="text-sm font-bold text-slate-700">{stats.offline}</span>
+            </div>
+          )}
+        </div>
+
+        {(filters.provinsi || filters.kabupaten || filters.jenisPerusahaan) && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-500 mb-2 font-semibold">
+              {isIndonesian ? 'Filter Aktif:' : 'Active Filters:'}
+            </p>
+            <div className="space-y-1">
+              {filters.provinsi && (
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  </svg>
+                  <span className="font-medium">{filters.provinsi}</span>
+                </div>
+              )}
+              {filters.kabupaten && (
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="font-medium">{filters.kabupaten}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Legend Panel */}
       <WaterLevelLegend isOpen={legendOpen} onToggle={() => setLegendOpen(!legendOpen)} />

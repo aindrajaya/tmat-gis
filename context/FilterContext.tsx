@@ -1,10 +1,13 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { FilterState } from '../types';
+import { usePerusahaan } from '../services/useApi';
 
 interface FilterContextType {
   filters: FilterState;
   updateFilter: (key: keyof FilterState, value: string) => void;
   resetFilters: () => void;
+  apiMode: 'dev' | 'prod';
+  setApiMode: (mode: 'dev' | 'prod') => void;
 }
 
 const defaultFilters: FilterState = {
@@ -19,6 +22,9 @@ const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [apiMode, setApiMode] = useState<'dev' | 'prod'>(
+    (import.meta.env.VITE_API_MODE as 'dev' | 'prod') || 'dev'
+  );
 
   const updateFilter = (key: keyof FilterState, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -27,7 +33,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const resetFilters = () => setFilters(defaultFilters);
 
   return (
-    <FilterContext.Provider value={{ filters, updateFilter, resetFilters }}>
+    <FilterContext.Provider value={{ filters, updateFilter, resetFilters, apiMode, setApiMode }}>
       {children}
     </FilterContext.Provider>
   );

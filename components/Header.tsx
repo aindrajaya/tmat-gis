@@ -59,14 +59,23 @@ const Header: React.FC = () => {
             </select>
           </div>
 
-          {/* Date Filter */}
-          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-md px-3 py-1.5">
-            <Calendar size={14} className="text-slate-400 mr-2" />
+          {/* Date Range Filter */}
+          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-md px-3 py-1.5 gap-2">
+            <Calendar size={14} className="text-slate-400" />
             <input 
               type="date" 
-              className="bg-transparent text-sm text-slate-700 focus:outline-none"
+              className="bg-transparent text-xs text-slate-700 focus:outline-none w-28"
               value={filters.startDate}
               onChange={(e) => updateFilter('startDate', e.target.value)}
+              title={t('dashboard:filters.startDate') || 'Start Date'}
+            />
+            <span className="text-slate-400 text-xs">-</span>
+            <input 
+              type="date" 
+              className="bg-transparent text-xs text-slate-700 focus:outline-none w-28"
+              value={filters.endDate}
+              onChange={(e) => updateFilter('endDate', e.target.value)}
+              title={t('dashboard:filters.endDate') || 'End Date'}
             />
           </div>
 

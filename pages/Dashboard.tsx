@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFilters } from '../context/FilterContext';
-import { MOCK_DEVICES, MOCK_REALTIME, MOCK_PERUSAHAAN } from '../services/mockData';
+import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
 import DashboardMap from '../components/DashboardMap';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -12,51 +12,118 @@ import { Device, RealtimeData } from '../types';
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { filters } = useFilters();
+  
+  // Fetch data from API
+  const { data: allDevices, loading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices();
+  const { data: allPerusahaan, loading: perusahaanLoading, error: perusahaanError } = usePerusahaan();
+  const { data: realtimeData, loading: realtimeLoading, error: realtimeError, refetch: refetchRealtime } = useRealtimeAll(undefined);
+  
   const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<any[]>([]);
 
+  // Filter devices and prepare chart data
   useEffect(() => {
-    // 1. Filter Devices
-    let filtered = MOCK_DEVICES;
+    if (!allDevices) return;
+
+    // 1. Filter Devices based on active filters
+    let filtered = allDevices;
     if (filters.provinsi) {
       filtered = filtered.filter(d => d.provinsi === filters.provinsi);
     }
     if (filters.kabupaten) {
       filtered = filtered.filter(d => d.kabupaten === filters.kabupaten);
     }
-    if (filters.jenis_perusahaan) {
-      // Join logic mock
-      const companyIds = MOCK_PERUSAHAAN
+    if (filters.jenis_perusahaan && allPerusahaan) {
+      // Join logic: filter companies by type, then devices by company ID
+      const companyIds = allPerusahaan
         .filter(p => p.jenis_perusahaan === filters.jenis_perusahaan)
         .map(p => p.id);
       filtered = filtered.filter(d => companyIds.includes(d.id_perusahaan));
     }
     setFilteredDevices(filtered);
 
-    // 2. Prepare Chart Data (Mocking Aggregation)
-    const deviceIds = filtered.map(d => d.device_id_unik);
-    const relevantData = MOCK_REALTIME.filter(r => deviceIds.includes(r.device_id_unik));
+    // 2. Prepare Chart Data from Real API Data
+    if (realtimeData && realtimeData.length > 0) {
+      const deviceIds = filtered.map(d => d.device_id_unik);
+      const relevantData = realtimeData.filter(r => deviceIds.includes(r.device_id_unik));
 
-    // Mock Stacked Bar: Condition % per day
-    const mockDailyData = [
-      { date: '2025-11-20', safe: 70, warning: 20, danger: 10 },
-      { date: '2025-11-21', safe: 65, warning: 25, danger: 10 },
-      { date: '2025-11-22', safe: 75, warning: 15, danger: 10 },
-      { date: '2025-11-23', safe: 80, warning: 15, danger: 5 },
-      { date: '2025-11-24', safe: 60, warning: 30, danger: 10 },
-      { date: '2025-11-25', safe: 70, warning: 20, danger: 10 }, // Corresponds to real data somewhat
-    ];
-    setChartData(mockDailyData);
+      // Aggregate by date: count safe/warning/danger conditions
+      const dailyAggregation: { [date: string]: { safe: number; warning: number; danger: number } } = {};
+      
+      relevantData.forEach(r => {
+        const date = r.timestamp_data.split(' ')[0]; // Extract date
+        if (!dailyAggregation[date]) {
+          dailyAggregation[date] = { safe: 0, warning: 0, danger: 0 };
+        }
+        
+        // Determine condition based on TMAT value
+        if (r.tmat_value < -0.4) {
+          dailyAggregation[date].danger++;
+        } else if (r.tmat_value < -0.2) {
+          dailyAggregation[date].warning++;
+        } else {
+          dailyAggregation[date].safe++;
+        }
+      });
 
-    // Mock Line Chart: Average TMAT
-    const mockTrend = relevantData.map((d, i) => ({
-      time: d.timestamp_data.split(' ')[1], // Time only
-      tmat: d.tmat_value
-    })).slice(0, 10); // Limit points
-    setTrendData(mockTrend);
+      // Convert to chart format and sort by date
+      const chartDataArray = Object.entries(dailyAggregation)
+        .map(([date, counts]) => ({ date, ...counts }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      
+      setChartData(chartDataArray.length > 0 ? chartDataArray : []);
 
-  }, [filters]);
+      // Line Chart: TMAT Trend (last 10 readings)
+      const trendDataArray = relevantData
+        .slice(-10)
+        .map(d => ({
+          time: d.timestamp_data.split(' ')[1] || d.timestamp_data, // Time only, fallback to full timestamp
+          tmat: d.tmat_value
+        }));
+      
+      setTrendData(trendDataArray);
+    }
+
+  }, [filters, allDevices, allPerusahaan, realtimeData]);
+
+  // Handle loading and errors
+  if (devicesLoading || perusahaanLoading || realtimeLoading) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <div className="inline-block">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          </div>
+          <p className="mt-4 text-slate-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (devicesError || perusahaanError || realtimeError) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <h3 className="font-bold text-red-800 mb-2">Error loading dashboard</h3>
+          <p className="text-red-600 mb-4">
+            {devicesError?.message || perusahaanError?.message || realtimeError?.message}
+          </p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => {
+                refetchDevices();
+                refetchRealtime();
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -75,11 +142,18 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-sm text-slate-500">{t('dashboard:metrics.criticalLowTmat')}</p>
-          <p className="text-2xl font-bold text-rose-600">3</p>
+          <p className="text-2xl font-bold text-rose-600">
+            {realtimeData?.filter(r => r.tmat_value < -0.4).length || 0}
+          </p>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-sm text-slate-500">{t('dashboard:metrics.avgTemperature')}</p>
-          <p className="text-2xl font-bold text-amber-500">28°C</p>
+          <p className="text-2xl font-bold text-amber-500">
+            {realtimeData && realtimeData.length > 0
+              ? (realtimeData.reduce((sum, r) => sum + (r.suhu_value || 0), 0) / realtimeData.length).toFixed(1)
+              : '0'}
+            °C
+          </p>
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { MOCK_DEVICES } from '../services/mockData';
+import { useDevices } from '../services/useApi';
 
 // Sub-component to handle map flyTo logic
 const MapUpdater = ({ lat, lng }: { lat: number, lng: number }) => {
@@ -21,6 +21,8 @@ const icon = L.icon({
 
 const DeviceForm: React.FC = () => {
   const { t } = useTranslation();
+  const { data: devices, loading, error, refetch } = useDevices();
+  
   const [formData, setFormData] = useState({
     deviceId: '',
     lat: -2.5,
@@ -188,41 +190,68 @@ const DeviceForm: React.FC = () => {
 
       {/* Device List Table */}
       <div className="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <h2 className="font-bold text-slate-800">{t('forms:registeredDevices.title')}</h2>
+          {loading && (
+            <div className="text-xs text-slate-500 flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b border-blue-500"></div>
+              Loading...
+            </div>
+          )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-slate-700 uppercase text-xs font-bold">
-              <tr>
-                <th className="px-6 py-3">{t('forms:registeredDevices.headers.deviceId')}</th>
-                <th className="px-6 py-3">{t('forms:registeredDevices.headers.location')}</th>
-                <th className="px-6 py-3">{t('forms:registeredDevices.headers.latitude')}</th>
-                <th className="px-6 py-3">{t('forms:registeredDevices.headers.longitude')}</th>
-                <th className="px-6 py-3">{t('forms:registeredDevices.headers.status')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {MOCK_DEVICES.map((device) => (
-                <tr 
-                  key={device.id} 
-                  className="hover:bg-slate-50 transition-colors"
-                  title={`ID: ${device.device_id_unik} | Status: ${device.status}`}
-                >
-                  <td className="px-6 py-3 font-medium text-emerald-700">{device.device_id_unik}</td>
-                  <td className="px-6 py-3">{device.kota}, {device.provinsi}</td>
-                  <td className="px-6 py-3 font-mono text-xs">{device.latitude.toFixed(6)}</td>
-                  <td className="px-6 py-3 font-mono text-xs">{device.longitude.toFixed(6)}</td>
-                  <td className="px-6 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${device.status === 'aktif' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {device.status}
-                    </span>
-                  </td>
+
+        {error ? (
+          <div className="px-6 py-8 text-center">
+            <p className="text-red-600 mb-3">Error loading devices</p>
+            <button 
+              onClick={refetch}
+              className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50 text-slate-700 uppercase text-xs font-bold">
+                <tr>
+                  <th className="px-6 py-3">{t('forms:registeredDevices.headers.deviceId')}</th>
+                  <th className="px-6 py-3">{t('forms:registeredDevices.headers.location')}</th>
+                  <th className="px-6 py-3">{t('forms:registeredDevices.headers.latitude')}</th>
+                  <th className="px-6 py-3">{t('forms:registeredDevices.headers.longitude')}</th>
+                  <th className="px-6 py-3">{t('forms:registeredDevices.headers.status')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {devices && devices.length > 0 ? (
+                  devices.map((device) => (
+                    <tr 
+                      key={device.id} 
+                      className="hover:bg-slate-50 transition-colors"
+                      title={`ID: ${device.device_id_unik} | Status: ${device.status}`}
+                    >
+                      <td className="px-6 py-3 font-medium text-emerald-700">{device.device_id_unik}</td>
+                      <td className="px-6 py-3">{device.kota}, {device.provinsi}</td>
+                      <td className="px-6 py-3 font-mono text-xs">{device.latitude.toFixed(6)}</td>
+                      <td className="px-6 py-3 font-mono text-xs">{device.longitude.toFixed(6)}</td>
+                      <td className="px-6 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${device.status === 'aktif' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {device.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                      {loading ? 'Loading devices...' : 'No devices found'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

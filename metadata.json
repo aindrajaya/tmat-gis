@@ -1,0 +1,5 @@
+{
+  "name": "TMAT Monitoring Dashboard",
+  "description": "Groundwater Level Monitoring System (TMAT) for Peatland Ecosystems with GIS Visualization and Data Management.",
+  "requestFramePermissions": []
+}

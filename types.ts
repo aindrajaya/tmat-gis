@@ -15,7 +15,9 @@ export interface Device {
   id: number;
   device_id_unik: string;
   id_perusahaan: number;
+  id_site: number;
   tipe_alat: string;
+  alamat?: string | null;
   provinsi: string;
   kabupaten: string;
   kota: string;
@@ -23,6 +25,7 @@ export interface Device {
   longitude: number;
   status: string;
   last_online: string;
+  created_at: string;
   kode_titik: string;
   kode_blok: string;
 }

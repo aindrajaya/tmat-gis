@@ -357,6 +357,66 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
     return groups;
   }, [filteredDevices]);
 
+  // Group devices by city with center coordinates and statistics
+  const cityGroups = useMemo(() => {
+    const cities = new Map<string, {
+      city: string;
+      provinsi: string;
+      devices: Device[];
+      centerLat: number;
+      centerLng: number;
+      stats: {
+        safe: number;
+        warning: number;
+        danger: number;
+        critical: number;
+        offline: number;
+      };
+    }>();
+
+    filteredDevices.forEach(device => {
+      const cityKey = `${device.kota}, ${device.provinsi}`;
+      if (!cities.has(cityKey)) {
+        cities.set(cityKey, {
+          city: device.kota,
+          provinsi: device.provinsi,
+          devices: [],
+          centerLat: 0,
+          centerLng: 0,
+          stats: {
+            safe: 0,
+            warning: 0,
+            danger: 0,
+            critical: 0,
+            offline: 0
+          }
+        });
+      }
+      cities.get(cityKey)!.devices.push(device);
+    });
+
+    // Calculate center coordinates and statistics for each city
+    cities.forEach((cityData, cityKey) => {
+      const lats = cityData.devices.map(d => d.latitude);
+      const lngs = cityData.devices.map(d => d.longitude);
+      cityData.centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+      cityData.centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+
+      // Calculate statistics
+      cityData.devices.forEach(device => {
+        const rtData = deviceDataMap.get(device.device_id_unik);
+        if (!rtData) {
+          cityData.stats.offline++;
+          return;
+        }
+        const status = getWaterLevelStatus(rtData.tmat_value);
+        cityData.stats[status.severity as keyof typeof cityData.stats]++;
+      });
+    });
+
+    return cities;
+  }, [filteredDevices, deviceDataMap]);
+
   // Calculate statistics
   const stats = useMemo(() => {
     const statusCounts = {
@@ -498,6 +558,157 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
                 </div>
               </Popup>
             </Polygon>
+          );
+        })}
+
+        {/* Render city-level markers - Always visible */}
+        {!realtimeLoading && Array.from(cityGroups.entries()).map(([cityKey, cityData]) => {
+          const total = cityData.devices.length;
+          const { stats } = cityData;
+          
+          // Determine most critical status color
+          let markerColor = '#06b6d4'; // default cyan
+          if (stats.critical > 0) markerColor = '#ef4444';
+          else if (stats.danger > 0) markerColor = '#f97316';
+          else if (stats.warning > 0) markerColor = '#f59e0b';
+          else if (stats.safe > 0) markerColor = '#10b981';
+
+          return (
+            <Marker
+              key={`city-${cityKey}`}
+              position={[cityData.centerLat, cityData.centerLng]}
+              icon={L.divIcon({
+                html: `
+                  <div style="
+                    background-color: rgba(255, 255, 255, 0.45);
+                    border: 1px solid ${markerColor};
+                    border-radius: 50%;
+                    width: 20px;
+                    height: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                    font-weight: bold;
+                    font-size: 14px;
+                    color: ${markerColor};
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                  "
+                  onmouseover="this.style.transform='scale(1.1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.95)';"
+                  onmouseout="this.style.transform='scale(1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.85)';"
+                  >
+                    ${total}
+                  </div>
+                `,
+                className: 'city-marker',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20],
+                popupAnchor: [0, -20],
+              })}
+              eventHandlers={{
+                click: (e) => {
+                  const map = e.target._map;
+                  // Zoom to city location
+                  map.setView([cityData.centerLat, cityData.centerLng], 12, {
+                    animate: true,
+                    duration: 1
+                  });
+                }
+              }}
+            >
+              <Popup maxWidth={320} minWidth={280}>
+                <div className="p-3">
+                  <h3 className="font-bold text-slate-800 text-base mb-1">
+                    {cityData.city}
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-3">{cityData.provinsi}</p>
+                  
+                  <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-emerald-800">
+                        {isIndonesian ? 'Total Perangkat' : 'Total Devices'}
+                      </span>
+                      <span className="text-xl font-bold text-emerald-600">{total}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-3">
+                    <h4 className="text-xs font-bold text-slate-700 mb-2">
+                      {isIndonesian ? 'Statistik Status:' : 'Status Statistics:'}
+                    </h4>
+                    
+                    {stats.safe > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-green-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Aman' : 'Safe'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-green-700">{stats.safe}</span>
+                      </div>
+                    )}
+
+                    {stats.warning > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-amber-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#f59e0b]"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Peringatan' : 'Warning'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-amber-700">{stats.warning}</span>
+                      </div>
+                    )}
+
+                    {stats.danger > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#f97316]"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Bahaya' : 'Danger'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-orange-700">{stats.danger}</span>
+                      </div>
+                    )}
+
+                    {stats.critical > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-red-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Kritis' : 'Critical'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-red-700">{stats.critical}</span>
+                      </div>
+                    )}
+
+                    {stats.offline > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-slate-400"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Offline' : 'Offline'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">{stats.offline}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200">
+                    <p className="text-xs text-slate-500 italic">
+                      {isIndonesian 
+                        ? 'Klik pada zona warna untuk detail perangkat'
+                        : 'Click on colored zones for device details'}
+                    </p>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
           );
         })}
 

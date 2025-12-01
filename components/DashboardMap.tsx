@@ -89,6 +89,22 @@ interface Props {
   devices: Device[];
 }
 
+// Component to handle automatic map bounds fitting
+const MapBoundsHandler: React.FC<{ devices: Device[] }> = ({ devices }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (devices && devices.length > 0) {
+      const bounds = L.latLngBounds(
+        devices.map(d => [d.latitude, d.longitude] as [number, number])
+      );
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+    }
+  }, [devices, map]);
+
+  return null;
+};
+
 // Legend component
 const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({ onToggle, isOpen }) => {
   const { t, i18n } = useTranslation();
@@ -177,9 +193,20 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   const [legendOpen, setLegendOpen] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showMarkers, setShowMarkers] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
 
   // Center on Indonesia roughly
   const center: [number, number] = [-2.5489, 118.0149];
+
+  // Force map re-render when realtime data loads
+  useEffect(() => {
+    if (realtimeData && realtimeData.length > 0) {
+      console.log('[DashboardMap] Realtime data loaded, forcing map update');
+      setMapKey(prev => prev + 1);
+    }
+  }, [realtimeData]);
 
   // Apply filters to devices
   const filteredDevices = useMemo(() => {
@@ -265,14 +292,21 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
         </div>
       )}
       
-      <MapContainer center={center} zoom={5} style={{ height: '100%', width: '100%' }}>
+      <MapContainer 
+        key={mapKey}
+        center={center} 
+        zoom={5} 
+        style={{ height: '100%', width: '100%' }}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* Render heat zones as circle markers */}
-        {filteredDevices.map((device) => {
+        <MapBoundsHandler devices={filteredDevices} />
+        
+        {/* Render heat zones as circle markers - Water Level Status Circles */}
+        {!realtimeLoading && filteredDevices.map((device) => {
           const rtData = deviceDataMap.get(device.device_id_unik);
           if (!rtData) {
             console.log('[DashboardMap] No realtime data for device:', device.device_id_unik);
@@ -368,8 +402,8 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
           );
         })}
 
-        {/* Render grouped device markers on top */}
-        {Array.from(deviceGroups.entries()).map(([locationKey, groupDevices]) => {
+        {/* Render grouped device markers on top - Conditional */}
+        {showMarkers && !realtimeLoading && Array.from(deviceGroups.entries()).map(([locationKey, groupDevices]: [string, Device[]]) => {
           const firstDevice = groupDevices[0];
           const deviceCount = groupDevices.length;
           
@@ -435,11 +469,90 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
         })}
       </MapContainer>
 
+      {/* Settings Panel - Bottom Left (above stats) */}
+      {settingsOpen && (
+        <div className="absolute bottom-32 left-4 z-[1000] bg-white rounded-lg shadow-lg p-4 min-w-[280px]">
+          <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {isIndonesian ? 'Pengaturan Peta' : 'Map Settings'}
+            </h3>
+            <button
+              onClick={() => setSettingsOpen(false)}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+              title={isIndonesian ? 'Tutup' : 'Close'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="text-sm font-medium text-slate-700">
+                  {isIndonesian ? 'Tampilkan Marker' : 'Show Markers'}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowMarkers(!showMarkers)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  showMarkers ? 'bg-emerald-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showMarkers ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-200">
+              <p className="text-xs text-slate-500 italic">
+                {isIndonesian 
+                  ? 'Aktifkan marker untuk melihat ikon perangkat di peta'
+                  : 'Enable markers to see device icons on the map'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Compact Statistics Button - Bottom Left */}
-      <div className="absolute bottom-4 left-4 z-[1000]">
+      <div className="absolute bottom-4 left-4 z-[1000] flex flex-col gap-2">
+        {/* Settings Toggle Button */}
+        <button
+          onClick={() => {
+            setSettingsOpen(!settingsOpen);
+            if (!settingsOpen) setStatsOpen(false); // Close stats when opening settings
+          }}
+          className={`bg-white rounded-lg shadow-lg hover:shadow-xl transition-all border border-slate-200 p-2.5 flex items-center justify-center ${
+            settingsOpen ? 'bg-emerald-50 border-emerald-300' : ''
+          }`}
+          title={isIndonesian ? 'Pengaturan' : 'Settings'}
+        >
+          <svg className={`w-5 h-5 ${settingsOpen ? 'text-emerald-600' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+
+        {/* Stats Panel */}
         {!statsOpen ? (
           <button
-            onClick={() => setStatsOpen(true)}
+            onClick={() => {
+              setStatsOpen(true);
+              setSettingsOpen(false); // Close settings when opening stats
+            }}
             className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-all border border-slate-200 p-3 flex items-center gap-3"
           >
             <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -479,7 +592,10 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold text-emerald-600">{stats.total}</span>
                 <button
-                  onClick={() => setStatsOpen(false)}
+                  onClick={() => {
+                    setStatsOpen(false);
+                    setSettingsOpen(false); // Also close settings
+                  }}
                   className="text-slate-400 hover:text-slate-600 transition-colors"
                   title={isIndonesian ? 'Tutup' : 'Close'}
                 >

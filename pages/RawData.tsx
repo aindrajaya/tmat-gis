@@ -19,7 +19,19 @@ const RawData: React.FC = () => {
   useEffect(() => {
     if (!realtimeData || !devices) return;
 
-    const data = realtimeData.map(rt => {
+    let filteredData = realtimeData;
+
+    // Apply date filters if set
+    if (filters.startDate || filters.endDate) {
+      filteredData = filteredData.filter(rt => {
+        const dataDate = rt.timestamp_data.split(' ')[0]; // Extract YYYY-MM-DD
+        const matchesStart = !filters.startDate || dataDate >= filters.startDate;
+        const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
+        return matchesStart && matchesEnd;
+      });
+    }
+
+    const data = filteredData.map(rt => {
       const device = devices.find(d => d.device_id_unik === rt.device_id_unik);
       return {
         ...rt,
@@ -29,7 +41,7 @@ const RawData: React.FC = () => {
 
     setTableData(data);
     setCurrentPage(1); // Reset to first page when data changes
-  }, [realtimeData, devices]);
+  }, [realtimeData, devices, filters.startDate, filters.endDate]);
 
   // Paginate table data
   const paginatedData = tableData.slice(

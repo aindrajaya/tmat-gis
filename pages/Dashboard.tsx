@@ -46,7 +46,17 @@ const Dashboard: React.FC = () => {
     // 2. Prepare Chart Data from Real API Data
     if (realtimeData && realtimeData.length > 0) {
       const deviceIds = filtered.map(d => d.device_id_unik);
-      const relevantData = realtimeData.filter(r => deviceIds.includes(r.device_id_unik));
+      let relevantData = realtimeData.filter(r => deviceIds.includes(r.device_id_unik));
+
+      // Apply date filters if set
+      if (filters.startDate || filters.endDate) {
+        relevantData = relevantData.filter(r => {
+          const dataDate = r.timestamp_data.split(' ')[0]; // Extract YYYY-MM-DD
+          const matchesStart = !filters.startDate || dataDate >= filters.startDate;
+          const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
+          return matchesStart && matchesEnd;
+        });
+      }
 
       // Aggregate by date: count safe/warning/danger conditions
       const dailyAggregation: { [date: string]: { safe: number; warning: number; danger: number } } = {};
@@ -57,9 +67,10 @@ const Dashboard: React.FC = () => {
           dailyAggregation[date] = { safe: 0, warning: 0, danger: 0 };
         }
         
-        // Determine condition based on TMAT value
+        // Determine condition based on TMAT value (aligned with map classification)
+        // Critical: < -0.6, Danger: -0.6 to -0.4, Warning: -0.4 to -0.2, Safe: >= -0.2
         if (r.tmat_value < -0.4) {
-          dailyAggregation[date].danger++;
+          dailyAggregation[date].danger++; // Includes both danger and critical
         } else if (r.tmat_value < -0.2) {
           dailyAggregation[date].warning++;
         } else {

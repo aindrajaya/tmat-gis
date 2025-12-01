@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Delaunay } from 'd3-delaunay';
+import { Filter, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { Device, RealtimeData } from '../types';
 import { useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
@@ -218,7 +219,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(undefined);
-  const { filters } = useFilters();
+  const { filters, updateFilter } = useFilters();
   
   const [legendOpen, setLegendOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
@@ -226,6 +227,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showMarkers, setShowMarkers] = useState(false);
   const [mapKey, setMapKey] = useState(0);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Center on Indonesia roughly
   const center: [number, number] = [-2.5489, 118.0149];
@@ -445,6 +447,115 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
 
   return (
     <div className="h-[500px] w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative">
+      {/* Filter Panel - Top of Map */}
+      <div className="absolute top-3 left-12 right-4 z-[1000]">
+        {/* Filter Toggle Button */}
+        {!filterOpen ? (
+          <button
+            onClick={() => setFilterOpen(true)}
+            className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-all border border-slate-200 px-4 py-2.5 flex items-center gap-2"
+          >
+            <Filter size={18} className="text-emerald-600" />
+            <span className="text-sm font-medium text-slate-700">
+              {isIndonesian ? 'Filter Data' : 'Filter Data'}
+            </span>
+            <ChevronDown size={16} className="text-slate-400" />
+          </button>
+        ) : (
+          <div className="bg-white rounded-lg shadow-lg border border-slate-200 p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Filter size={18} className="text-emerald-600" />
+                <h3 className="text-sm font-bold text-slate-800">
+                  {isIndonesian ? 'Filter Data' : 'Filter Data'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setFilterOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <ChevronUp size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Province Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  {isIndonesian ? 'Provinsi' : 'Province'}
+                </label>
+                <select 
+                  className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={filters.provinsi}
+                  onChange={(e) => updateFilter('provinsi', e.target.value)}
+                >
+                  <option value="">{isIndonesian ? 'Semua Provinsi' : 'All Provinces'}</option>
+                  <option value="Jawa Timur">Jawa Timur</option>
+                  <option value="Riau">Riau</option>
+                  <option value="Kalimantan Tengah">Kalimantan Tengah</option>
+                  <option value="Jambi">Jambi</option>
+                </select>
+              </div>
+
+              {/* Regency Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  {isIndonesian ? 'Kabupaten' : 'Regency'}
+                </label>
+                <select 
+                  className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={filters.kabupaten}
+                  onChange={(e) => updateFilter('kabupaten', e.target.value)}
+                >
+                  <option value="">{isIndonesian ? 'Semua Kabupaten' : 'All Regencies'}</option>
+                  <option value="Surabaya">Surabaya</option>
+                  <option value="Pekanbaru">Pekanbaru</option>
+                  <option value="Palangka">Palangka</option>
+                </select>
+              </div>
+
+              {/* Company Type Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  {isIndonesian ? 'Jenis Perusahaan' : 'Company Type'}
+                </label>
+                <select 
+                  className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={filters.jenis_perusahaan}
+                  onChange={(e) => updateFilter('jenis_perusahaan', e.target.value)}
+                >
+                  <option value="">{isIndonesian ? 'Semua Jenis' : 'All Types'}</option>
+                  <option value="PBPH">PBPH</option>
+                  <option value="Perkebunan">Perkebunan</option>
+                </select>
+              </div>
+
+              {/* Date Range Filter */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-slate-600">
+                  {isIndonesian ? 'Rentang Tanggal' : 'Date Range'}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="date" 
+                    className="bg-slate-50 border border-slate-200 rounded-md px-2 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-1"
+                    value={filters.startDate}
+                    onChange={(e) => updateFilter('startDate', e.target.value)}
+                  />
+                  <span className="text-slate-400 text-xs">-</span>
+                  <input 
+                    type="date" 
+                    className="bg-slate-50 border border-slate-200 rounded-md px-2 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 flex-1"
+                    value={filters.endDate}
+                    onChange={(e) => updateFilter('endDate', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {realtimeLoading && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[1001] bg-white/90 px-4 py-2 rounded-lg shadow-lg">
           <div className="flex items-center gap-2">

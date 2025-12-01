@@ -1,0 +1,260 @@
+{
+	"info": {
+		"_postman_id": "d5725c9f-b124-4054-879a-738de6a4d8e1",
+		"name": "API Monitoring TMAT - Portal V1 (Frontend/Public Key)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "7863488"
+	},
+	"item": [
+		{
+			"name": "Daftar Perusahaan",
+			"item": [
+				{
+					"name": "Get All Perusahaan",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{portalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/perusahaan",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"perusahaan"
+							]
+						},
+						"description": "API ini digunakan untuk mendapatkan semua daftar perusahaan yang aktif"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Detail Perusahaan by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{portalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/perusahaan?id={{id_perusahaan}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"perusahaan"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "{{id_perusahaan}}",
+									"description": "integer, id perusahaan yang terdaftar"
+								}
+							]
+						},
+						"description": "Api ini digunakan untuk mendapatkan informasi perusahaan by ID"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Daftar Device",
+			"item": [
+				{
+					"name": "Get All Device",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{portalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/device",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"device"
+							]
+						},
+						"description": "Api ini digunakan untuk mendapatkan semua daftar device yang terdaftar"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Device by Device ID Unik",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{portalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/device?device_id={{deviceId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"device"
+							],
+							"query": [
+								{
+									"key": "device_id",
+									"value": "{{deviceId}}"
+								}
+							]
+						},
+						"description": "Api ini digunakan untuk mendapatkan infomasi device by id device"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Realtime Data",
+			"item": [
+				{
+					"name": "Get Realtime All (Summary)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{portalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/realtime_all?id_perusahaan={{id_perusahaan}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"realtime_all"
+							],
+							"query": [
+								{
+									"key": "id_perusahaan",
+									"value": "{{id_perusahaan}}",
+									"description": "Filter opsional"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Realtime Device by Period",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{portalApiKey}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/realtime_device?device_id={{deviceId}}&start_date=2025-11-01&end_date=2025-11-16&limit=100",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"realtime_device"
+							],
+							"query": [
+								{
+									"key": "device_id",
+									"value": "{{deviceId}}"
+								},
+								{
+									"key": "start_date",
+									"value": "2025-11-01"
+								},
+								{
+									"key": "end_date",
+									"value": "2025-11-16"
+								},
+								{
+									"key": "limit",
+									"value": "100"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "value",
+				"value": "{{APIKEY_V1}}",
+				"type": "string"
+			},
+			{
+				"key": "key",
+				"value": "X-API-KEY",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://staging.kurmaspace.com/klhk/app/index.php/api/portal_v1",
+			"description": "Base URL untuk Controller Portal_V1 (sesuaikan dengan path Anda)."
+		},
+		{
+			"key": "portalApiKey",
+			"value": "TULIS_KEY_PUBLIK_DISINI",
+			"description": "API Key Level 1 yang ditujukan untuk akses frontend/umum."
+		},
+		{
+			"key": "deviceId",
+			"value": "DEV-GLJ-001",
+			"description": "Contoh Device ID Unik untuk pengujian."
+		},
+		{
+			"key": "id_perusahaan",
+			"value": "1",
+			"description": "Contoh ID Perusahaan untuk pengujian filter."
+		}
+	]
+}

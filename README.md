@@ -268,9 +268,214 @@ const { filters, updateFilter, resetFilters } = useFilters();
 
 Create `.env.local` file (not committed to repo):
 ```
-VITE_API_URL=http://localhost:3000
+# API Configuration
+VITE_API_MODE=dev              # 'dev' or 'prod'
+
+# Production API
+VITE_PROD_API_URL=https://staging.kurmaspace.com/klhk/app/index.php/api/portal_v1
+VITE_PROD_API_KEY=your_production_api_key
+
+# Development API  
+VITE_DEV_API_URL=https://coherent-afton-aruskoding-32476f63.koyeb.app/api/portal_v1
+VITE_DEV_API_KEY=your_dev_api_key
+
+# App Configuration
 VITE_APP_NAME=TMAT Monitor
 ```
+
+**Important:** Never commit `.env.local` to version control. Use `.env.example` as a template for configuration.
+
+## 🔌 API Integration
+
+The application connects to real backend APIs with support for both development and production environments.
+
+### API Client Architecture
+
+**Files:**
+- `services/apiClient.ts` - Main API client class with all endpoint methods
+- `services/useApi.ts` - React hooks for easy API data fetching in components
+
+### Supported Endpoints
+
+#### 1. **Perusahaan (Companies)**
+```typescript
+// Get all companies
+const companies = await client.getPerusahaan();
+
+// Get specific company by ID
+const company = await client.getPerusahaanById(1);
+```
+
+#### 2. **Device**
+```typescript
+// Get all devices
+const devices = await client.getDevice();
+
+// Get specific device by Device ID
+const device = await client.getDeviceById('DEV-GLJ-001');
+```
+
+#### 3. **Realtime All (Summary Data)**
+```typescript
+// Get all realtime data
+const realtimeData = await client.getRealtimeAll();
+
+// Get realtime data for specific company
+const companyData = await client.getRealtimeAll(1);
+```
+
+#### 4. **Realtime Device (Time-Series Data)**
+```typescript
+// Get device data for date range with pagination
+const data = await client.getRealtimeDevice(
+  'DEV-GLJ-001',
+  '2025-11-01',
+  '2025-11-30',
+  limit = 100,
+  offset = 0
+);
+
+// Get paginated response with metadata
+const paginated = await client.getRealtimeDevicePaginated(
+  'DEV-GLJ-001',
+  '2025-11-01',
+  '2025-11-30',
+  limit = 100,
+  offset = 0
+);
+// Returns: { data: [], total, offset, limit }
+```
+
+### Using API Hooks in Components
+
+**React Hooks** make it easy to fetch data in components with automatic loading and error handling:
+
+```typescript
+import { useDevices, useRealtimeDevice } from '../services/useApi';
+import { useEffect } from 'react';
+
+function MyComponent() {
+  // Get all devices
+  const { data: devices, loading, error, refetch } = useDevices();
+  
+  // Get device data for specific date range
+  const { 
+    data: realtimeData, 
+    loading: loadingData, 
+    error: dataError,
+    fetch: fetchData 
+  } = useRealtimeDevice(
+    'DEV-GLJ-001',
+    '2025-11-01',
+    '2025-11-30'
+  );
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  if (loading) return <div>Loading devices...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  return (
+    <div>
+      {devices?.map(device => (
+        <div key={device.id}>{device.device_id_unik}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Available Hooks
+
+| Hook | Purpose | Returns |
+|------|---------|---------|
+| `useDevices()` | Get all devices | `Device[]` |
+| `useDeviceById(id)` | Get specific device | `Device` |
+| `usePerusahaan()` | Get all companies | `Perusahaan[]` |
+| `usePerusahaanById(id)` | Get specific company | `Perusahaan` |
+| `useRealtimeAll(idPerusahaan?)` | Get realtime summary | `RealtimeData[]` |
+| `useRealtimeDevice(deviceId, startDate, endDate, limit, offset)` | Get time-series data | `RealtimeData[]` |
+| `useAPIClient()` | Get API client directly | `APIClient` |
+
+### API Response Handling
+
+The API client automatically handles response format differences between development and production APIs:
+
+**Response Format Adaptation:**
+- **Development API**: Returns paginated response `{ data: [], total, offset, limit }`
+- **Production API**: Returns array directly `[]`
+- **Client**: Both formats are automatically normalized to array
+
+### Switching Between Dev/Production
+
+**Option 1: Environment Variable**
+```bash
+VITE_API_MODE=prod  # Switch to production
+VITE_API_MODE=dev   # Switch to development
+```
+
+**Option 2: Runtime Switching**
+```typescript
+import { useFilters } from '../context/FilterContext';
+
+function ApiModeToggle() {
+  const { apiMode, setApiMode } = useFilters();
+  
+  return (
+    <button onClick={() => setApiMode(apiMode === 'dev' ? 'prod' : 'dev')}>
+      Current: {apiMode}
+    </button>
+  );
+}
+```
+
+### Error Handling
+
+All API hooks include built-in error handling:
+
+```typescript
+const { data, loading, error, refetch } = useDevices();
+
+if (error) {
+  return (
+    <div className="error">
+      <p>Failed to load: {error.message}</p>
+      <button onClick={refetch}>Retry</button>
+    </div>
+  );
+}
+```
+
+### Direct API Client Usage
+
+For advanced use cases, use the API client directly:
+
+```typescript
+import { getAPIClient } from '../services/apiClient';
+
+const client = getAPIClient();
+const devices = await client.getDevice();
+```
+
+### API Authentication
+
+All requests include the `X-API-KEY` header automatically:
+
+```typescript
+// The following is added automatically by the API client:
+headers: {
+  'X-API-KEY': apiKey,
+  'Content-Type': 'application/json'
+}
+```
+
+**Important:** Set your API keys in `.env.local`:
+- `VITE_PROD_API_KEY` - Production API key
+- `VITE_DEV_API_KEY` - Development API key
+
+
 
 ## 🧪 Development
 

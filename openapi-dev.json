@@ -1,0 +1,650 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API Monitoring TMAT - Portal V1",
+    "description": "Mock backend API for plantation monitoring system",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/portal_v1/perusahaan": {
+      "get": {
+        "tags": [
+          "Perusahaan"
+        ],
+        "summary": "Get Perusahaan",
+        "description": "Get company/companies\n- If id is provided, return single company\n- Otherwise, return all companies",
+        "operationId": "get_perusahaan_api_portal_v1_perusahaan_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PerusahaanResponse"
+                  },
+                  "title": "Response Get Perusahaan Api Portal V1 Perusahaan Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal_v1/device": {
+      "get": {
+        "tags": [
+          "Device"
+        ],
+        "summary": "Get Device",
+        "description": "Get device(s)\n- If device_id is provided, return specific device\n- Otherwise, return all devices",
+        "operationId": "get_device_api_portal_v1_device_get",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceResponse"
+                  },
+                  "title": "Response Get Device Api Portal V1 Device Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal_v1/realtime_all": {
+      "get": {
+        "tags": [
+          "Realtime Data"
+        ],
+        "summary": "Get Realtime All",
+        "description": "Get realtime data summary\n- If id_perusahaan provided, filter by company\n- Otherwise return all realtime data",
+        "operationId": "get_realtime_all_api_portal_v1_realtime_all_get",
+        "parameters": [
+          {
+            "name": "id_perusahaan",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id Perusahaan"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RealtimeDataResponse"
+                  },
+                  "title": "Response Get Realtime All Api Portal V1 Realtime All Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal_v1/realtime_device": {
+      "get": {
+        "tags": [
+          "Realtime Data"
+        ],
+        "summary": "Get Realtime Device",
+        "description": "Get realtime device data within date range\n- Filters by device_id and date range (full day)\n- Supports pagination with offset and limit\n- Returns paginated data with metadata",
+        "operationId": "get_realtime_device_api_portal_v1_realtime_device_get",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Unique device identifier",
+              "title": "Device Id"
+            },
+            "description": "Unique device identifier"
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Start date in YYYY-MM-DD format",
+              "title": "Start Date"
+            },
+            "description": "Start date in YYYY-MM-DD format"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "End date in YYYY-MM-DD format",
+              "title": "End Date"
+            },
+            "description": "End date in YYYY-MM-DD format"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "description": "Results per page",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Results per page"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Pagination offset",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RealtimeDeviceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Welcome message",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DeviceResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "device_id_unik": {
+            "type": "string",
+            "title": "Device Id Unik"
+          },
+          "id_perusahaan": {
+            "type": "integer",
+            "title": "Id Perusahaan"
+          },
+          "id_site": {
+            "type": "integer",
+            "title": "Id Site"
+          },
+          "tipe_alat": {
+            "type": "string",
+            "title": "Tipe Alat"
+          },
+          "alamat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alamat"
+          },
+          "provinsi": {
+            "type": "string",
+            "title": "Provinsi"
+          },
+          "kabupaten": {
+            "type": "string",
+            "title": "Kabupaten"
+          },
+          "kota": {
+            "type": "string",
+            "title": "Kota"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "last_online": {
+            "type": "string",
+            "title": "Last Online"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "kode_titik": {
+            "type": "string",
+            "title": "Kode Titik"
+          },
+          "kode_blok": {
+            "type": "string",
+            "title": "Kode Blok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "device_id_unik",
+          "id_perusahaan",
+          "id_site",
+          "tipe_alat",
+          "provinsi",
+          "kabupaten",
+          "kota",
+          "latitude",
+          "longitude",
+          "status",
+          "last_online",
+          "created_at",
+          "kode_titik",
+          "kode_blok"
+        ],
+        "title": "DeviceResponse",
+        "description": "Device response schema"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PerusahaanResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nama_perusahaan": {
+            "type": "string",
+            "title": "Nama Perusahaan"
+          },
+          "pic_kontak": {
+            "type": "string",
+            "title": "Pic Kontak"
+          },
+          "email_kontak": {
+            "type": "string",
+            "title": "Email Kontak"
+          },
+          "telepon": {
+            "type": "string",
+            "title": "Telepon"
+          },
+          "alamat": {
+            "type": "string",
+            "title": "Alamat"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "kode_perusahaan": {
+            "type": "string",
+            "title": "Kode Perusahaan"
+          },
+          "jenis_perusahaan": {
+            "type": "string",
+            "title": "Jenis Perusahaan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nama_perusahaan",
+          "pic_kontak",
+          "email_kontak",
+          "telepon",
+          "alamat",
+          "status",
+          "created_at",
+          "kode_perusahaan",
+          "jenis_perusahaan"
+        ],
+        "title": "PerusahaanResponse",
+        "description": "Company response schema"
+      },
+      "RealtimeDataResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "device_id_unik": {
+            "type": "string",
+            "title": "Device Id Unik"
+          },
+          "timestamp_data": {
+            "type": "string",
+            "title": "Timestamp Data"
+          },
+          "tmat_value": {
+            "type": "number",
+            "title": "Tmat Value"
+          },
+          "suhu_value": {
+            "type": "number",
+            "title": "Suhu Value"
+          },
+          "ph_value": {
+            "type": "number",
+            "title": "Ph Value"
+          },
+          "api_key_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Used"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "device_id_unik",
+          "timestamp_data",
+          "tmat_value",
+          "suhu_value",
+          "ph_value"
+        ],
+        "title": "RealtimeDataResponse",
+        "description": "Realtime sensor data response schema"
+      },
+      "RealtimeDeviceResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RealtimeDataResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "RealtimeDeviceResponse",
+        "description": "Paginated realtime device data response"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

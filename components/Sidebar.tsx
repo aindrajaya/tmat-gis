@@ -1,13 +1,22 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Key, Users, FileText, ChevronRight } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Database, Key, Users, FileText, ChevronRight, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isIndonesian = i18n.language === 'id';
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const NavItem = ({ to, icon: Icon, label }: { to: string, icon: any, label: string }) => (
     <Link
@@ -45,16 +54,23 @@ const Sidebar: React.FC = () => {
         <NavItem to="/users" icon={Users} label={t('common:nav.userRoles')} />
       </nav>
 
-      <div className="p-4 border-t border-slate-100">
+      <div className="p-4 border-t border-slate-100 space-y-3">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
-            SA
+            {user?.name.charAt(0) || 'A'}
           </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-700">{t('common:user.role')}</p>
-            <p className="text-xs text-slate-500">{t('common:user.permission')}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-700 truncate">{user?.name || 'Admin'}</p>
+            <p className="text-xs text-slate-500 truncate">{user?.email || 'admin@example.com'}</p>
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg transition-colors font-medium"
+        >
+          <LogOut size={18} />
+          <span>{isIndonesian ? 'Keluar' : 'Logout'}</span>
+        </button>
       </div>
     </aside>
   );

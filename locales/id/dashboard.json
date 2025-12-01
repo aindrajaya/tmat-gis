@@ -1,0 +1,40 @@
+{
+  "title": "Ikhtisar Pemantauan",
+  "subtitle": "Tingkat Air Tanah Lahan Gambut Waktu Nyata",
+  "filters": {
+    "allProvinces": "Semua Provinsi",
+    "allRegencies": "Semua Kabupaten/Kota",
+    "allTypes": "Semua Tipe",
+    "provinces": {
+      "jawaTImur": "Jawa Timur",
+      "riau": "Riau",
+      "kalimantan": "Kalimantan Tengah",
+      "jambi": "Jambi"
+    },
+    "regencies": {
+      "surabaya": "Surabaya",
+      "pekanbaru": "Pekanbaru",
+      "palangka": "Palangka"
+    },
+    "types": {
+      "pbph": "PBPH",
+      "perkebunan": "Perkebunan"
+    }
+  },
+  "metrics": {
+    "totalStations": "Total Stasiun",
+    "active": "Aktif",
+    "criticalLowTmat": "TMAT Rendah Kritis",
+    "avgTemperature": "Suhu Rata-rata"
+  },
+  "map": {
+    "stationDistribution": "Peta Distribusi Stasiun"
+  },
+  "charts": {
+    "dailyTmatCondition": "Kondisi TMAT Harian (%)",
+    "safe": "Aman (> -0.4m)",
+    "warning": "Peringatan",
+    "danger": "Bahaya (< -0.8m)",
+    "tmatTrend": "Tren TMAT (Perangkat Sampel)"
+  }
+}

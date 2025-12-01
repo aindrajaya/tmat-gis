@@ -1,0 +1,30 @@
+{
+  "deviceForm": {
+    "title": "Kelola Pencatat Perangkat",
+    "deviceId": "ID Perangkat (Unik)",
+    "deviceIdPlaceholder": "DEV-XXX-001",
+    "kodeTitik": "Kode Titik (SK)",
+    "kodeBlok": "Kode Blok",
+    "locationInput": "Input Lokasi",
+    "latitude": "Lintang",
+    "longitude": "Bujur",
+    "coordinateHelper": "*Memasukkan koordinat memperbarui penampil di bawah. Periksa peta untuk menentukan Provinsi/Kota.",
+    "administrativeLocation": "Lokasi Administratif (Pilihan Manual)",
+    "provinsi": "Provinsi",
+    "provinceSelect": "-- Pilih Provinsi berdasarkan Peta --",
+    "kabupaten": "Kabupaten/Kota",
+    "citySelect": "-- Pilih Kota berdasarkan Peta --",
+    "geoTaggingHelper": "Pembantu Penandaan Geo",
+    "boundaryLayer": "Lapisan Batas: Aktif"
+  },
+  "registeredDevices": {
+    "title": "Perangkat Terdaftar",
+    "headers": {
+      "deviceId": "ID Perangkat",
+      "location": "Lokasi",
+      "latitude": "Lintang",
+      "longitude": "Bujur",
+      "status": "Status"
+    }
+  }
+}

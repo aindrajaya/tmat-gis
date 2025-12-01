@@ -1,0 +1,14 @@
+{
+  "rawData": {
+    "title": "Telemetri Data Mentah",
+    "headers": {
+      "timestamp": "Stempel Waktu",
+      "deviceId": "ID Perangkat",
+      "location": "Lokasi",
+      "tmat": "TMAT (m)",
+      "temperature": "Suhu (°C)",
+      "ph": "pH"
+    },
+    "pagination": "Menampilkan X catatan"
+  }
+}

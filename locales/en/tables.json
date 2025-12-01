@@ -1,0 +1,14 @@
+{
+  "rawData": {
+    "title": "Raw Data Telemetry",
+    "headers": {
+      "timestamp": "Timestamp",
+      "deviceId": "Device ID",
+      "location": "Location",
+      "tmat": "TMAT (m)",
+      "temperature": "Temp (°C)",
+      "ph": "pH"
+    },
+    "pagination": "Showing X records"
+  }
+}

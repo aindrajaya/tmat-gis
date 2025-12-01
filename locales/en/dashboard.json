@@ -1,0 +1,40 @@
+{
+  "title": "Monitoring Overview",
+  "subtitle": "Real-time Peatland Groundwater Levels",
+  "filters": {
+    "allProvinces": "All Provinces",
+    "allRegencies": "All Regencies",
+    "allTypes": "All Types",
+    "provinces": {
+      "jawaTImur": "Jawa Timur",
+      "riau": "Riau",
+      "kalimantan": "Kalimantan Tengah",
+      "jambi": "Jambi"
+    },
+    "regencies": {
+      "surabaya": "Surabaya",
+      "pekanbaru": "Pekanbaru",
+      "palangka": "Palangka"
+    },
+    "types": {
+      "pbph": "PBPH",
+      "perkebunan": "Perkebunan"
+    }
+  },
+  "metrics": {
+    "totalStations": "Total Stations",
+    "active": "Active",
+    "criticalLowTmat": "Critical Low TMAT",
+    "avgTemperature": "Avg Temperature"
+  },
+  "map": {
+    "stationDistribution": "Station Distribution Map"
+  },
+  "charts": {
+    "dailyTmatCondition": "Daily TMAT Condition (%)",
+    "safe": "Safe (> -0.4m)",
+    "warning": "Warning",
+    "danger": "Danger (< -0.8m)",
+    "tmatTrend": "TMAT Trend (Sample Devices)"
+  }
+}

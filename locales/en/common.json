@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "TMAT Monitor"
+  },
+  "nav": {
+    "main": "Main",
+    "dashboard": "Dashboard",
+    "rawData": "Raw Data",
+    "management": "Management",
+    "deviceLogger": "Device Logger",
+    "companyData": "Company Data",
+    "admin": "Admin",
+    "apiManagement": "API Management",
+    "userRoles": "User Roles"
+  },
+  "user": {
+    "role": "Super Admin",
+    "permission": "Full Access"
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "save": "Save Device",
+    "exportCsv": "Export CSV"
+  },
+  "language": {
+    "english": "English",
+    "bahasa": "Bahasa Indonesia"
+  }
+}

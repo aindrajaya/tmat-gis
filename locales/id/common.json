@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "Monitor TMAT"
+  },
+  "nav": {
+    "main": "Utama",
+    "dashboard": "Dashboard",
+    "rawData": "Data Mentah",
+    "management": "Manajemen",
+    "deviceLogger": "Pencatat Perangkat",
+    "companyData": "Data Perusahaan",
+    "admin": "Admin",
+    "apiManagement": "Manajemen API",
+    "userRoles": "Peran Pengguna"
+  },
+  "user": {
+    "role": "Super Admin",
+    "permission": "Akses Penuh"
+  },
+  "buttons": {
+    "cancel": "Batal",
+    "save": "Simpan Perangkat",
+    "exportCsv": "Ekspor CSV"
+  },
+  "language": {
+    "english": "English",
+    "bahasa": "Bahasa Indonesia"
+  }
+}

@@ -35,9 +35,16 @@ const Sidebar: React.FC = () => {
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 h-screen fixed left-0 top-0 z-30 flex flex-col">
-      <div className="p-6 border-b border-slate-100 flex items-center space-x-2">
-        <div className="w-8 h-8 bg-emerald-600 rounded-md flex items-center justify-center text-white font-bold text-lg">T</div>
-        <span className="text-xl font-bold text-slate-800 tracking-tight">{t('common:app.name')}</span>
+      <div className="p-6 border-b border-slate-100 flex items-center space-x-3">
+        <img 
+          src="/klhk-logo.png" 
+          alt="KLHK Logo" 
+          className="w-10 h-10 flex-shrink-0 object-contain"
+        />
+        <div className="flex-1 min-w-0">
+          <span className="text-base font-bold text-slate-800 block leading-tight">{t('common:app.name')}</span>
+          <span className="text-[10px] text-slate-500 block leading-tight">KLHK</span>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

@@ -41,16 +41,25 @@ const Login: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-2xl p-8 border border-slate-200">
           {/* Logo and Title */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl shadow-lg mb-4">
-              <span className="text-3xl font-bold text-white">T</span>
+            <div className="flex justify-center mb-4">
+              <img 
+                src="/klhk-logo.png" 
+                alt="KLHK Logo" 
+                className="w-24 h-24 object-contain"
+              />
             </div>
             <h1 className="text-2xl font-bold text-slate-800 mb-2">
               {isIndonesian ? 'Selamat Datang' : 'Welcome Back'}
             </h1>
+            <p className="text-slate-700 font-semibold text-sm mb-1">
+              {isIndonesian 
+                ? 'Kementerian Lingkungan Hidup dan Kehutanan' 
+                : 'Ministry of Environment and Forestry'}
+            </p>
             <p className="text-slate-600 text-sm">
               {isIndonesian 
-                ? 'Masuk ke Dashboard Monitoring TMAT' 
-                : 'Sign in to TMAT Monitoring Dashboard'}
+                ? 'Sistem Monitoring TMAT' 
+                : 'TMAT Monitoring System'}
             </p>
           </div>
 
@@ -167,8 +176,8 @@ const Login: React.FC = () => {
         {/* Footer */}
         <p className="text-center text-sm text-slate-500 mt-6">
           {isIndonesian 
-            ? '© 2025 TMAT Monitoring System. Semua hak dilindungi.' 
-            : '© 2025 TMAT Monitoring System. All rights reserved.'}
+            ? '© 2025 Kementerian Lingkungan Hidup dan Kehutanan. Semua hak dilindungi.' 
+            : '© 2025 Ministry of Environment and Forestry. All rights reserved.'}
         </p>
       </div>
     </div>

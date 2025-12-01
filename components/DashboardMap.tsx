@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Delaunay } from 'd3-delaunay';
-import { Filter, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Filter, Calendar, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 import { Device, RealtimeData } from '../types';
 import { useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
@@ -228,6 +228,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   const [showMarkers, setShowMarkers] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Center on Indonesia roughly
   const center: [number, number] = [-2.5489, 118.0149];
@@ -446,7 +447,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
   }, [filteredDevices, deviceDataMap]);
 
   return (
-    <div className="h-[500px] w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative">
+    <div className={`${isExpanded ? 'h-[800px]' : 'h-[500px]'} w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative transition-all duration-300`}>
       {/* Filter Panel - Top of Map */}
       <div className="absolute top-3 left-12 right-4 z-[1000]">
         {/* Filter Toggle Button */}
@@ -1113,8 +1114,8 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
       {/* Legend Panel */}
       <WaterLevelLegend isOpen={legendOpen} onToggle={() => setLegendOpen(!legendOpen)} />
 
-      {/* Info button in bottom right */}
-      <div className="absolute bottom-4 right-4 z-[1000]">
+      {/* Info and Expand buttons in bottom right */}
+      <div className="absolute bottom-4 right-4 z-[1000] flex gap-2">
         <button 
           className="bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow border border-slate-200"
           onClick={() => setLegendOpen(!legendOpen)}
@@ -1133,6 +1134,17 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
               d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
             />
           </svg>
+        </button>
+        <button 
+          className="bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-shadow border border-slate-200"
+          onClick={() => setIsExpanded(!isExpanded)}
+          title={isExpanded ? (isIndonesian ? 'Perkecil Peta' : 'Minimize Map') : (isIndonesian ? 'Perbesar Peta' : 'Expand Map')}
+        >
+          {isExpanded ? (
+            <Minimize2 size={20} className="text-slate-600" />
+          ) : (
+            <Maximize2 size={20} className="text-slate-600" />
+          )}
         </button>
       </div>
     </div>

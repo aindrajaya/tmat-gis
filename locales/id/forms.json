@@ -26,5 +26,18 @@
       "longitude": "Bujur",
       "status": "Status"
     }
+  },
+  "dateFilter": {
+    "title": "Filter Rentang Tanggal",
+    "quickSelect": "Pilihan Cepat",
+    "today": "Hari Ini",
+    "7days": "7 Hari Terakhir",
+    "14days": "14 Hari Terakhir",
+    "30days": "30 Hari Terakhir",
+    "customRange": "Rentang Kustom",
+    "startDate": "Tanggal Mulai",
+    "endDate": "Tanggal Akhir",
+    "reset": "Atur Ulang Filter"
   }
 }
+

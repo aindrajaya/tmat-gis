@@ -31,7 +31,12 @@
     "stationDistribution": "Peta Distribusi Stasiun"
   },
   "charts": {
+    "analyticsTitle": "Analitik TMAT",
+    "daily": "Harian",
+    "weekly": "Mingguan",
     "dailyTmatCondition": "Kondisi TMAT Harian (%)",
+    "weeklyTmatCondition": "Kondisi TMAT Mingguan (%)",
+    "statusTrend": "Tren Jumlah Status",
     "safe": "Aman (> -0.4m)",
     "warning": "Peringatan",
     "danger": "Bahaya (< -0.8m)",

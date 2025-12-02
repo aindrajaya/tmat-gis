@@ -26,5 +26,18 @@
       "longitude": "Longitude",
       "status": "Status"
     }
+  },
+  "dateFilter": {
+    "title": "Date Range Filter",
+    "quickSelect": "Quick Select",
+    "today": "Today",
+    "7days": "Last 7 Days",
+    "14days": "Last 14 Days",
+    "30days": "Last 30 Days",
+    "customRange": "Custom Range",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "reset": "Reset Filters"
   }
 }
+

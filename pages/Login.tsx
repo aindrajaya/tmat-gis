@@ -70,8 +70,8 @@ const Login: React.FC = () => {
             </h1>
             <p className="text-slate-700 font-semibold text-sm mb-1">
               {isIndonesian 
-                ? 'Kementerian Lingkungan Hidup dan Kehutanan' 
-                : 'Ministry of Environment and Forestry'}
+                ? 'Kementerian Lingkungan Hidup' 
+                : 'Ministry of Environment'}
             </p>
             <p className="text-slate-600 text-sm">
               {isIndonesian 
@@ -179,13 +179,13 @@ const Login: React.FC = () => {
                   <p className="text-xs text-slate-600">
                     <strong>{isIndonesian ? 'Email:' : 'Email:'}</strong>{' '}
                     <code className="bg-white px-2 py-0.5 rounded text-emerald-700 font-mono text-xs">
-                      admin@klhkproject.mail
+                      admin@menlhkproject.mail
                     </code>
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard('admin@klhkproject.mail', 'email')}
+                  onClick={() => copyToClipboard('admin@menlhkproject.mail', 'email')}
                   className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded transition-colors"
                   title={isIndonesian ? 'Salin email' : 'Copy email'}
                 >
@@ -237,8 +237,8 @@ const Login: React.FC = () => {
         {/* Footer */}
         <p className="text-center text-sm text-slate-500 mt-6">
           {isIndonesian 
-            ? '© 2025 Kementerian Lingkungan Hidup dan Kehutanan. Semua hak dilindungi.' 
-            : '© 2025 Ministry of Environment and Forestry. All rights reserved.'}
+            ? '© 2025 Kementerian Lingkungan Hidup. Semua hak dilindungi.' 
+            : '© 2025 Ministry of Environment. All rights reserved.'}
         </p>
       </div>
     </div>

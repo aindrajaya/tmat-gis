@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Mock authentication - only works with specific credentials
-    if (email === 'admin@klhkproject.mail' && password === 'Admin12345') {
+    if (email === 'admin@menlhkproject.mail' && password === 'Admin12345') {
       const userData = {
         email: email,
         name: 'System Administrator'

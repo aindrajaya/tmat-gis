@@ -47,7 +47,7 @@ const Sidebar: React.FC = () => {
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
             <span className="text-base font-bold text-slate-800 block leading-tight">{t('common:app.name')}</span>
-            <span className="text-[10px] text-slate-500 block leading-tight">KLHK</span>
+            <span className="text-[10px] text-slate-500 block leading-tight">MENLHK</span>
           </div>
         )}
       </div>

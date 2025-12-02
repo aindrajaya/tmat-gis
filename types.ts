@@ -54,4 +54,5 @@ export interface FilterState {
   jenis_perusahaan: string;
   startDate: string;
   endDate: string;
+  timePeriod?: 'today' | '7d' | '14d' | '30d' | 'custom';
 }

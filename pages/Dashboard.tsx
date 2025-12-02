@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useFilters } from '../context/FilterContext';
 import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
 import DashboardMap from '../components/DashboardMap';
+import FilterPanel from '../components/FilterPanel';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   LineChart, Line
@@ -12,6 +13,7 @@ import { Device, RealtimeData } from '../types';
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { filters } = useFilters();
+  const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
   
   // Fetch data from API
   const { data: allDevices, loading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices();
@@ -20,7 +22,25 @@ const Dashboard: React.FC = () => {
   
   const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [weeklyChartData, setWeeklyChartData] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<any[]>([]);
+
+  // Helper function to get week start date (Monday)
+  const getWeekStart = (date: string): string => {
+    const d = new Date(date + 'T00:00:00');
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+    d.setDate(diff);
+    return d.toISOString().split('T')[0];
+  };
+
+  // Helper function to format week label
+  const formatWeekLabel = (startDate: string): string => {
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(startDate + 'T00:00:00');
+    end.setDate(end.getDate() + 6);
+    return `${start.toLocaleDateString('en-CA')} - ${end.toLocaleDateString('en-CA')}`;
+  };
 
   // Filter devices and prepare chart data
   useEffect(() => {
@@ -58,7 +78,7 @@ const Dashboard: React.FC = () => {
         });
       }
 
-      // Aggregate by date: count safe/warning/danger conditions
+      // DAILY AGGREGATION
       const dailyAggregation: { [date: string]: { safe: number; warning: number; danger: number } } = {};
       
       relevantData.forEach(r => {
@@ -79,11 +99,41 @@ const Dashboard: React.FC = () => {
       });
 
       // Convert to chart format and sort by date
-      const chartDataArray = Object.entries(dailyAggregation)
+      const dailyChartArray = Object.entries(dailyAggregation)
         .map(([date, counts]) => ({ date, ...counts }))
         .sort((a, b) => a.date.localeCompare(b.date));
       
-      setChartData(chartDataArray.length > 0 ? chartDataArray : []);
+      setChartData(dailyChartArray.length > 0 ? dailyChartArray : []);
+
+      // WEEKLY AGGREGATION
+      const weeklyAggregation: { [weekStart: string]: { safe: number; warning: number; danger: number } } = {};
+      
+      relevantData.forEach(r => {
+        const date = r.timestamp_data.split(' ')[0];
+        const weekStart = getWeekStart(date);
+        if (!weeklyAggregation[weekStart]) {
+          weeklyAggregation[weekStart] = { safe: 0, warning: 0, danger: 0 };
+        }
+        
+        if (r.tmat_value < -0.4) {
+          weeklyAggregation[weekStart].danger++;
+        } else if (r.tmat_value < -0.2) {
+          weeklyAggregation[weekStart].warning++;
+        } else {
+          weeklyAggregation[weekStart].safe++;
+        }
+      });
+
+      // Convert to chart format with week labels
+      const weeklyChartArray = Object.entries(weeklyAggregation)
+        .map(([weekStart, counts]) => ({ 
+          date: formatWeekLabel(weekStart),
+          dateKey: weekStart,
+          ...counts 
+        }))
+        .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+      
+      setWeeklyChartData(weeklyChartArray.length > 0 ? weeklyChartArray : []);
 
       // Line Chart: TMAT Trend (last 10 readings)
       const trendDataArray = relevantData
@@ -174,26 +224,80 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Filter Panel */}
+      <FilterPanel />
+
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Stacked Bar */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
-          <h3 className="font-semibold text-slate-700 mb-4">{t('dashboard:charts.dailyTmatCondition')}</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="date" fontSize={12} />
-              <YAxis fontSize={12} />
-              <RechartsTooltip />
-              <Legend />
-              <Bar dataKey="safe" stackId="a" fill="#10b981" name={t('dashboard:charts.safe')} />
-              <Bar dataKey="warning" stackId="a" fill="#f59e0b" name={t('dashboard:charts.warning')} />
-              <Bar dataKey="danger" stackId="a" fill="#ef4444" name={t('dashboard:charts.danger')} />
-            </BarChart>
-          </ResponsiveContainer>
+      <section className="space-y-4">
+        {/* View Toggle */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-800">{t('dashboard:charts.analyticsTitle')}</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setChartView('daily')}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                chartView === 'daily'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {t('dashboard:charts.daily')}
+            </button>
+            <button
+              onClick={() => setChartView('weekly')}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                chartView === 'weekly'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {t('dashboard:charts.weekly')}
+            </button>
+          </div>
         </div>
 
-        {/* Line Chart */}
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Stacked Bar */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
+            <h3 className="font-semibold text-slate-700 mb-4">
+              {chartView === 'daily' 
+                ? t('dashboard:charts.dailyTmatCondition')
+                : t('dashboard:charts.weeklyTmatCondition')}
+            </h3>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartView === 'daily' ? chartData : weeklyChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" fontSize={12} />
+                <YAxis fontSize={12} />
+                <RechartsTooltip />
+                <Legend />
+                <Bar dataKey="safe" stackId="a" fill="#10b981" name={t('dashboard:charts.safe')} />
+                <Bar dataKey="warning" stackId="a" fill="#f59e0b" name={t('dashboard:charts.warning')} />
+                <Bar dataKey="danger" stackId="a" fill="#ef4444" name={t('dashboard:charts.danger')} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Status Trend Line Chart */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
+            <h3 className="font-semibold text-slate-700 mb-4">{t('dashboard:charts.statusTrend')}</h3>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartView === 'daily' ? chartData : weeklyChartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" fontSize={12} />
+                <YAxis fontSize={12} />
+                <RechartsTooltip />
+                <Legend />
+                <Line type="monotone" dataKey="safe" stroke="#10b981" strokeWidth={2} dot={false} name={t('dashboard:charts.safe')} />
+                <Line type="monotone" dataKey="warning" stroke="#f59e0b" strokeWidth={2} dot={false} name={t('dashboard:charts.warning')} />
+                <Line type="monotone" dataKey="danger" stroke="#ef4444" strokeWidth={2} dot={false} name={t('dashboard:charts.danger')} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* TMAT Trend Chart - Sample Devices */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
           <h3 className="font-semibold text-slate-700 mb-4">{t('dashboard:charts.tmatTrend')}</h3>
           <ResponsiveContainer width="100%" height="100%">
@@ -206,7 +310,7 @@ const Dashboard: React.FC = () => {
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

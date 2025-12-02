@@ -31,7 +31,12 @@
     "stationDistribution": "Station Distribution Map"
   },
   "charts": {
+    "analyticsTitle": "TMAT Analytics",
+    "daily": "Daily",
+    "weekly": "Weekly",
     "dailyTmatCondition": "Daily TMAT Condition (%)",
+    "weeklyTmatCondition": "Weekly TMAT Condition (%)",
+    "statusTrend": "Status Count Trend",
     "safe": "Safe (> -0.4m)",
     "warning": "Warning",
     "danger": "Danger (< -0.8m)",

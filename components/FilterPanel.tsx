@@ -30,10 +30,10 @@ const FilterPanel: React.FC = () => {
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-      {/* Mobile Toggle Header */}
+      {/* Toggle Header - Visible on All Screens */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full lg:hidden flex items-center justify-between p-4 hover:bg-slate-50 transition"
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition"
       >
         <h3 className="font-semibold text-slate-700">{t('forms:dateFilter.title')}</h3>
         <svg
@@ -46,13 +46,9 @@ const FilterPanel: React.FC = () => {
         </svg>
       </button>
 
-      {/* Desktop Header */}
-      <div className="hidden lg:block p-4 border-b border-slate-200">
-        <h3 className="font-semibold text-slate-700">{t('forms:dateFilter.title')}</h3>
-      </div>
-
-      {/* Content */}
-      <div className={`${isExpanded ? 'block' : 'hidden'} lg:block p-4 space-y-4`}>
+      {/* Content - Collapsible */}
+      <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-96' : 'max-h-0'}`}>
+        <div className="p-4 space-y-4 border-t border-slate-200">
         {/* Preset Buttons */}
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-600">{t('forms:dateFilter.quickSelect')}</p>
@@ -116,6 +112,7 @@ const FilterPanel: React.FC = () => {
               </span>
             )}
           </p>
+        </div>
         </div>
       </div>
     </div>

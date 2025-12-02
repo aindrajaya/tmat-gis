@@ -4,10 +4,7 @@ import { useFilters } from '../context/FilterContext';
 import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
 import DashboardMap from '../components/DashboardMap';
 import FilterPanel from '../components/FilterPanel';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
-  LineChart, Line
-} from 'recharts';
+import ChartContainer from '../components/charts/ChartContainer';
 import { Device, RealtimeData } from '../types';
 
 const Dashboard: React.FC = () => {
@@ -228,89 +225,13 @@ const Dashboard: React.FC = () => {
       <FilterPanel />
 
       {/* Charts Section */}
-      <section className="space-y-4">
-        {/* View Toggle */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">{t('dashboard:charts.analyticsTitle')}</h2>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setChartView('daily')}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                chartView === 'daily'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {t('dashboard:charts.daily')}
-            </button>
-            <button
-              onClick={() => setChartView('weekly')}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                chartView === 'weekly'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {t('dashboard:charts.weekly')}
-            </button>
-          </div>
-        </div>
-
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Stacked Bar */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
-            <h3 className="font-semibold text-slate-700 mb-4">
-              {chartView === 'daily' 
-                ? t('dashboard:charts.dailyTmatCondition')
-                : t('dashboard:charts.weeklyTmatCondition')}
-            </h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartView === 'daily' ? chartData : weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" fontSize={12} />
-                <YAxis fontSize={12} />
-                <RechartsTooltip />
-                <Legend />
-                <Bar dataKey="safe" stackId="a" fill="#10b981" name={t('dashboard:charts.safe')} />
-                <Bar dataKey="warning" stackId="a" fill="#f59e0b" name={t('dashboard:charts.warning')} />
-                <Bar dataKey="danger" stackId="a" fill="#ef4444" name={t('dashboard:charts.danger')} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Status Trend Line Chart */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
-            <h3 className="font-semibold text-slate-700 mb-4">{t('dashboard:charts.statusTrend')}</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartView === 'daily' ? chartData : weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" fontSize={12} />
-                <YAxis fontSize={12} />
-                <RechartsTooltip />
-                <Legend />
-                <Line type="monotone" dataKey="safe" stroke="#10b981" strokeWidth={2} dot={false} name={t('dashboard:charts.safe')} />
-                <Line type="monotone" dataKey="warning" stroke="#f59e0b" strokeWidth={2} dot={false} name={t('dashboard:charts.warning')} />
-                <Line type="monotone" dataKey="danger" stroke="#ef4444" strokeWidth={2} dot={false} name={t('dashboard:charts.danger')} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* TMAT Trend Chart - Sample Devices */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
-          <h3 className="font-semibold text-slate-700 mb-4">{t('dashboard:charts.tmatTrend')}</h3>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="time" fontSize={12} />
-              <YAxis fontSize={12} />
-              <RechartsTooltip />
-              <Line type="monotone" dataKey="tmat" stroke="#3b82f6" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+      <ChartContainer 
+        chartView={chartView}
+        setChartView={setChartView}
+        dailyData={chartData}
+        weeklyData={weeklyChartData}
+        trendData={trendData}
+      />
     </div>
   );
 };

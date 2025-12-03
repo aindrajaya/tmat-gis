@@ -1027,6 +1027,10 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
                 <div className="w-2 h-2 rounded-full bg-[#ef4444]"></div>
                 <span className="text-xs font-bold text-slate-700">{stats.critical}</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.offline}</span>
+              </div>
             </div>
             <div className="pl-3 border-l border-slate-200">
               <span className="text-sm font-bold text-emerald-600">{stats.total}</span>

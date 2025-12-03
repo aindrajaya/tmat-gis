@@ -321,7 +321,7 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
       const status = getWaterLevelStatus(rtData.tmat_value);
       
       // Clip polygon to reasonable size (max 0.005 degrees from device center)
-      const maxRadius = 0.005;
+      const maxRadius = 0.01;
       const clippedPolygon = polygon.map(([lat, lng]) => {
         const distLat = lat - device.latitude;
         const distLng = lng - device.longitude;
@@ -678,12 +678,24 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
           const total = cityData.devices.length;
           const { stats } = cityData;
           
-          // Determine most critical status color
+          // Determine color based on most dominant status
           let markerColor = '#06b6d4'; // default cyan
-          if (stats.critical > 0) markerColor = '#ef4444';
-          else if (stats.danger > 0) markerColor = '#f97316';
-          else if (stats.warning > 0) markerColor = '#f59e0b';
-          else if (stats.safe > 0) markerColor = '#10b981';
+          const statusCounts = [
+            { color: '#10b981', count: stats.safe },      // green
+            { color: '#f59e0b', count: stats.warning },   // yellow
+            { color: '#f97316', count: stats.danger },    // orange
+            { color: '#ef4444', count: stats.critical },  // red
+            { color: '#94a3b8', count: stats.offline }    // gray
+          ];
+          
+          // Find the status with the highest count
+          const dominant = statusCounts.reduce((max, current) => 
+            current.count > max.count ? current : max
+          );
+          
+          if (dominant.count > 0) {
+            markerColor = dominant.color;
+          }
 
           return (
             <Marker

@@ -316,9 +316,17 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
     // Attach realtime data and status to each polygon, with size constraint
     return voronoi.map(({ device, polygon }) => {
       const rtData = deviceDataMap.get(device.device_id_unik);
-      if (!rtData) return null;
-
-      const status = getWaterLevelStatus(rtData.tmat_value);
+      
+      // Handle offline devices
+      const status = rtData 
+        ? getWaterLevelStatus(rtData.tmat_value)
+        : {
+            level: isIndonesian ? 'Offline' : 'Offline',
+            color: '#94a3b8',
+            range: 'N/A',
+            description: 'Device offline',
+            severity: 'offline'
+          };
       
       // Clip polygon to reasonable size (max 0.005 degrees from device center)
       const maxRadius = 0.01;
@@ -626,46 +634,56 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
                       </div>
                     </div>
                     
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500">
-                        {isIndonesian ? 'Ketinggian' : 'Water Level'}:
-                      </span>
-                      <span className="text-xs font-semibold text-slate-700">
-                        {status.range}
-                      </span>
-                    </div>
+                    {rtData ? (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">
+                            {isIndonesian ? 'Ketinggian' : 'Water Level'}:
+                          </span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            {status.range}
+                          </span>
+                        </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500">TMAT:</span>
-                      <span className="text-xs font-semibold text-slate-700">
-                        {rtData.tmat_value.toFixed(2)}
-                      </span>
-                    </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">TMAT:</span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            {rtData.tmat_value.toFixed(2)}
+                          </span>
+                        </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500">
-                        {isIndonesian ? 'Suhu' : 'Temperature'}:
-                      </span>
-                      <span className="text-xs font-semibold text-slate-700">
-                        {rtData.suhu_value.toFixed(1)}°C
-                      </span>
-                    </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">
+                            {isIndonesian ? 'Suhu' : 'Temperature'}:
+                          </span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            {rtData.suhu_value.toFixed(1)}°C
+                          </span>
+                        </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500">pH:</span>
-                      <span className="text-xs font-semibold text-slate-700">
-                        {rtData.ph_value.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">pH:</span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            {rtData.ph_value.toFixed(2)}
+                          </span>
+                        </div>
 
-                  <div className="pt-2 border-t border-slate-100">
-                    <p className="text-xs text-slate-500">
-                      {isIndonesian ? 'Terakhir diperbarui' : 'Last updated'}:
-                    </p>
-                    <p className="text-xs font-medium text-slate-700">
-                      {rtData.timestamp_data}
-                    </p>
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-xs text-slate-500">
+                            {isIndonesian ? 'Terakhir diperbarui' : 'Last updated'}:
+                          </p>
+                          <p className="text-xs font-medium text-slate-700">
+                            {rtData.timestamp_data}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="pt-2 pb-2">
+                        <p className="text-xs text-slate-500 italic text-center">
+                          {isIndonesian ? 'Tidak ada data realtime tersedia' : 'No realtime data available'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Popup>

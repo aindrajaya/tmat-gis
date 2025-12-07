@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, Key, Users, FileText, ChevronRight, ChevronLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, Database, Key, Users, FileText, Map as MapIcon, ChevronRight, ChevronLeft, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
@@ -68,6 +68,7 @@ const Sidebar: React.FC = () => {
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-2">{t('common:nav.main')}</div>}
         <NavItem to="/" icon={LayoutDashboard} label={t('common:nav.dashboard')} />
+        <NavItem to="/map" icon={MapIcon} label={t('common:nav.map')} />
         <NavItem to="/raw-data" icon={FileText} label={t('common:nav.rawData')} />
 
         {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-6">{t('common:nav.management')}</div>}

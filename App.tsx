@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
+import FullMap from './pages/FullMap';
 import DeviceForm from './pages/DeviceForm';
 import RawData from './pages/RawData';
 import Companies from './pages/Companies';
@@ -44,6 +45,19 @@ const App: React.FC = () => {
             <Routes>
               {/* Public Route */}
               <Route path="/login" element={<Login />} />
+
+              {/* Public map-only view */}
+              <Route path="/map" element={<FullMap />} />
+
+              {/* Full-screen map without layout */}
+              <Route
+                path="/map-full"
+                element={
+                  <ProtectedRoute>
+                    <FullMap />
+                  </ProtectedRoute>
+                }
+              />
               
               {/* Protected Routes */}
               <Route path="/*" element={

@@ -129,6 +129,7 @@ const getWaterLevelStatus = (tmatValue: number) => {
 
 interface Props {
   devices: Device[];
+  heightClass?: string;
 }
 
 // Component to handle automatic map bounds fitting
@@ -215,7 +216,7 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({
   );
 };
 
-const DashboardMap: React.FC<Props> = ({ devices }) => {
+const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(undefined);
@@ -454,8 +455,10 @@ const DashboardMap: React.FC<Props> = ({ devices }) => {
     };
   }, [filteredDevices, deviceDataMap]);
 
+  const containerHeight = heightClass || (isExpanded ? 'h-[800px]' : 'h-[500px]');
+
   return (
-    <div className={`${isExpanded ? 'h-[800px]' : 'h-[500px]'} w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative transition-all duration-300`}>
+    <div className={`${containerHeight} w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative transition-all duration-300`}>
       {/* Filter Panel - Top of Map */}
       <div className="absolute top-3 left-12 right-4 z-[1000]">
         {/* Filter Toggle Button */}

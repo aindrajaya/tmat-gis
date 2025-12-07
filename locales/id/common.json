@@ -5,6 +5,7 @@
   "nav": {
     "main": "Utama",
     "dashboard": "Dashboard",
+    "map": "Peta",
     "rawData": "Data Mentah",
     "management": "Manajemen",
     "deviceLogger": "Pencatat Perangkat",

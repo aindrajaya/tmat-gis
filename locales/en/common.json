@@ -5,6 +5,7 @@
   "nav": {
     "main": "Main",
     "dashboard": "Dashboard",
+    "map": "Map",
     "rawData": "Raw Data",
     "management": "Management",
     "deviceLogger": "Device Logger",

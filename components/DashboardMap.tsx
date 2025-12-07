@@ -220,7 +220,7 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(undefined);
-  const { filters, updateFilter } = useFilters();
+  const { filters, updateFilter, enforcedProvinsi } = useFilters();
   
   const [legendOpen, setLegendOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
@@ -498,8 +498,9 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
                 </label>
                 <select 
                   className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={filters.provinsi}
+                  value={enforcedProvinsi || filters.provinsi}
                   onChange={(e) => updateFilter('provinsi', e.target.value)}
+                  disabled={!!enforcedProvinsi}
                 >
                   <option value="">{isIndonesian ? 'Semua Provinsi' : 'All Provinces'}</option>
                   <option value="Jawa Timur">Jawa Timur</option>
@@ -507,6 +508,13 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
                   <option value="Kalimantan Tengah">Kalimantan Tengah</option>
                   <option value="Jambi">Jambi</option>
                 </select>
+                {enforcedProvinsi && (
+                  <p className="text-[11px] text-emerald-600 font-medium">
+                    {isIndonesian
+                      ? `Akun Anda dibatasi ke provinsi ${enforcedProvinsi}`
+                      : `Your account is restricted to ${enforcedProvinsi} province`}
+                  </p>
+                )}
               </div>
 
               {/* Regency Filter */}

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { FilterState } from '../types';
 import { usePerusahaan } from '../services/useApi';
+import { useAuth } from './AuthContext';
 
 interface FilterContextType {
   filters: FilterState;
@@ -9,6 +10,7 @@ interface FilterContextType {
   resetFilters: () => void;
   apiMode: 'dev' | 'prod';
   setApiMode: (mode: 'dev' | 'prod') => void;
+  enforcedProvinsi: string | null;
 }
 
 const getDateRange = (period: string): { startDate: string; endDate: string } => {
@@ -59,8 +61,13 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [apiMode, setApiMode] = useState<'dev' | 'prod'>(
     (import.meta.env.VITE_API_MODE as 'dev' | 'prod') || 'dev'
   );
+  const { user } = useAuth();
+  const [enforcedProvinsi, setEnforcedProvinsi] = useState<string | null>(null);
 
   const updateFilter = (key: keyof FilterState, value: string) => {
+    if (key === 'provinsi' && enforcedProvinsi) {
+      return; // prevent overriding enforced province
+    }
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
@@ -73,10 +80,27 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }));
   };
 
-  const resetFilters = () => setFilters(defaultFilters);
+  const resetFilters = () => setFilters({
+    ...defaultFilters,
+    provinsi: enforcedProvinsi || '',
+  });
+
+  // Enforce province filter when user has province restriction
+  useEffect(() => {
+    if (user?.provinsi) {
+      setEnforcedProvinsi(user.provinsi);
+      setFilters(prev => ({
+        ...prev,
+        provinsi: user.provinsi,
+      }));
+    } else {
+      setEnforcedProvinsi(null);
+      setFilters(prev => ({ ...prev, provinsi: '' }));
+    }
+  }, [user?.provinsi]);
 
   return (
-    <FilterContext.Provider value={{ filters, updateFilter, setTimePeriod, resetFilters, apiMode, setApiMode }}>
+    <FilterContext.Provider value={{ filters, updateFilter, setTimePeriod, resetFilters, apiMode, setApiMode, enforcedProvinsi }}>
       {children}
     </FilterContext.Provider>
   );

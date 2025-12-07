@@ -1,17 +1,52 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+type User = { email: string; name: string; provinsi?: string | null };
+
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: { email: string; name: string } | null;
+  user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
+
+const mockUsers: Array<User & { password: string }> = [
+  {
+    email: 'admin@menlhkproject.mail',
+    password: 'Admin12345',
+    name: 'System Administrator',
+    provinsi: null, // no province restriction
+  },
+  {
+    email: 'jatim@demo.mail',
+    password: 'Jatim12345',
+    name: 'Operator Jawa Timur',
+    provinsi: 'Jawa Timur',
+  },
+  {
+    email: 'jambi@demo.mail',
+    password: 'Jambi12345',
+    name: 'Operator Jambi',
+    provinsi: 'Jambi',
+  },
+  {
+    email: 'riau@demo.mail',
+    password: 'Riau12345',
+    name: 'Operator Riau',
+    provinsi: 'Riau',
+  },
+  {
+    email: 'kalteng@demo.mail',
+    password: 'Kalteng12345',
+    name: 'Operator Kalimantan Tengah',
+    provinsi: 'Kalimantan Tengah',
+  },
+];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -28,25 +63,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication - only works with specific credentials
-    if (email === 'admin@menlhkproject.mail' && password === 'Admin12345') {
-      const userData = {
-        email: email,
-        name: 'System Administrator'
-      };
-      
+    // Mock authentication - matches against predefined users
+    const matchedUser = mockUsers.find(
+      (u) => u.email === email.trim() && u.password === password
+    );
+
+    if (matchedUser) {
+      const { password: _pw, ...userData } = matchedUser;
       setIsAuthenticated(true);
       setUser(userData);
-      
+
       // Store in localStorage
-      localStorage.setItem('tmat_auth', JSON.stringify({
-        user: userData,
-        timestamp: new Date().toISOString()
-      }));
-      
+      localStorage.setItem(
+        'tmat_auth',
+        JSON.stringify({
+          user: userData,
+          timestamp: new Date().toISOString(),
+        })
+      );
+
       return true;
     }
-    
+
     return false;
   };
 

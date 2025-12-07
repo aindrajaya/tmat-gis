@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useDevices } from '../services/useApi';
+import { useFilters } from '../context/FilterContext';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 // Sub-component to handle map flyTo logic
@@ -23,6 +24,7 @@ const icon = L.icon({
 const DeviceForm: React.FC = () => {
   const { t } = useTranslation();
   const { data: devices, loading, error, refetch } = useDevices();
+  const { enforcedProvinsi } = useFilters();
   const [expandedDeviceId, setExpandedDeviceId] = useState<number | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
   
@@ -267,7 +269,9 @@ const DeviceForm: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {devices && devices.length > 0 ? (
-                  devices.map((device) => (
+                  devices
+                    .filter(d => !enforcedProvinsi || d.provinsi === enforcedProvinsi)
+                    .map((device) => (
                     <React.Fragment key={device.id}>
                       <tr 
                         className="hover:bg-slate-50 transition-colors cursor-pointer"

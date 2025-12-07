@@ -5,7 +5,7 @@ import { useFilters } from '../context/FilterContext';
 
 const RawData: React.FC = () => {
   const { t } = useTranslation();
-  const { filters } = useFilters();
+  const { filters, enforcedProvinsi } = useFilters();
   
   // Fetch data from API
   const { data: realtimeData, loading, error, refetch } = useRealtimeAll(undefined);
@@ -20,6 +20,16 @@ const RawData: React.FC = () => {
     if (!realtimeData || !devices) return;
 
     let filteredData = realtimeData;
+
+    // Province gate: drop records outside enforced or selected province
+    const targetProv = enforcedProvinsi || filters.provinsi;
+    if (targetProv) {
+      const deviceById = new Map(devices.map(d => [d.device_id_unik, d]));
+      filteredData = filteredData.filter(rt => {
+        const device = deviceById.get(rt.device_id_unik);
+        return device ? device.provinsi === targetProv : false;
+      });
+    }
 
     // Apply date filters if set
     if (filters.startDate || filters.endDate) {

@@ -11,6 +11,10 @@ export interface Perusahaan {
   created_at: string;
 }
 
+export interface PerusahaanWithDevices extends Perusahaan {
+  devices: Device[];
+}
+
 export interface Device {
   id: number;
   device_id_unik: string;

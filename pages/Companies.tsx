@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { usePerusahaan } from '../services/useApi';
 import { Perusahaan } from '../types';
 import { Building2, Phone, Mail, User, Calendar, MapPin, Hash } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Companies: React.FC = () => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
-  const { data: companies, loading, error } = usePerusahaan();
+  const { user } = useAuth();
+  const { data: companies, loading, error } = usePerusahaan(user?.perusahaanId || undefined);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');

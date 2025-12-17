@@ -53,14 +53,14 @@ export function useApi<T>(
 /**
  * Hook to get all devices
  */
-export function useDevices() {
-  return useApi<Device[]>((client) => client.getDevice());
+export function useDevices(perusahaanId?: number) {
+  return useApi<Device[]>((client) => client.getDevice(undefined, perusahaanId));
 }
 
 /**
  * Hook to get specific device by ID
  */
-export function useDeviceById(deviceId: string) {
+export function useDeviceById(deviceId: string, perusahaanId?: number) {
   const [state, setState] = useState<UseApiState<Device>>({
     data: null,
     loading: false,
@@ -76,7 +76,7 @@ export function useDeviceById(deviceId: string) {
     setState({ data: null, loading: true, error: null });
     try {
       const client = getAPIClient();
-      const result = await client.getDeviceById(deviceId);
+      const result = await client.getDeviceById(deviceId, perusahaanId);
       setState({ data: result, loading: false, error: null });
     } catch (error) {
       setState({
@@ -85,7 +85,7 @@ export function useDeviceById(deviceId: string) {
         error: error instanceof Error ? error : new Error(String(error)),
       });
     }
-  }, [deviceId]);
+  }, [deviceId, perusahaanId]);
 
   return { ...state, fetch };
 }
@@ -93,8 +93,8 @@ export function useDeviceById(deviceId: string) {
 /**
  * Hook to get all companies
  */
-export function usePerusahaan() {
-  return useApi<Perusahaan[]>((client) => client.getPerusahaan());
+export function usePerusahaan(id?: number) {
+  return useApi<Perusahaan[]>((client) => client.getPerusahaan(id));
 }
 
 /**

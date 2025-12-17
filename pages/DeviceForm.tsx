@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { useDevices } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 // Sub-component to handle map flyTo logic
 const MapUpdater = ({ lat, lng }: { lat: number, lng: number }) => {
@@ -23,7 +24,8 @@ const icon = L.icon({
 
 const DeviceForm: React.FC = () => {
   const { t } = useTranslation();
-  const { data: devices, loading, error, refetch } = useDevices();
+  const { user } = useAuth();
+  const { data: devices, loading, error, refetch } = useDevices(user?.perusahaanId || undefined);
   const { enforcedProvinsi } = useFilters();
   const [expandedDeviceId, setExpandedDeviceId] = useState<number | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);

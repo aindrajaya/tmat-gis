@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useRealtimeAll, useDevices } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
+import { useAuth } from '../context/AuthContext';
 
 const RawData: React.FC = () => {
   const { t } = useTranslation();
   const { filters, enforcedProvinsi } = useFilters();
+  const { user } = useAuth();
   
   // Fetch data from API
-  const { data: realtimeData, loading, error, refetch } = useRealtimeAll(undefined);
-  const { data: devices } = useDevices();
+  const { data: realtimeData, loading, error, refetch } = useRealtimeAll(user?.perusahaanId || undefined);
+  const { data: devices } = useDevices(user?.perusahaanId || undefined);
   
   const [tableData, setTableData] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);

@@ -25,6 +25,12 @@ const Login: React.FC = () => {
     { province: 'Kalimantan Tengah', email: 'kalteng@demo.mail', password: 'Kalteng12345' },
   ];
 
+  const companyAccounts = [
+    { company: 'PT. Sawit Jawa Timur 1', email: 'contact1@sawitjt.com', password: 'Perusahaan19' },
+    { company: 'PT. Sawit Kalimantan Tengah 1', email: 'contact6@sawitkt.com', password: 'Perusahaan24' },
+    { company: 'PT. Sawit Riau 1', email: 'contact16@sawitri.com', password: 'Perusahaan34' },
+  ];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -254,6 +260,28 @@ const Login: React.FC = () => {
                   </p>
                   <p className="text-[11px] text-slate-600">
                     Password: <code className="bg-slate-100 px-1 rounded">{acc.password}</code>
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Company-scoped demo accounts */}
+          <div className="mt-4 bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+            <p className="text-xs font-semibold text-emerald-700 mb-2 text-center">
+              {isIndonesian
+                ? 'Akun Perusahaan (hanya perangkat milik perusahaan terkait):'
+                : 'Company Accounts (only their own devices):'}
+            </p>
+            <div className="space-y-2">
+              {companyAccounts.map((acc) => (
+                <div key={acc.email} className="p-2 rounded-md bg-white border border-emerald-100">
+                  <p className="text-xs font-bold text-slate-800">{acc.company}</p>
+                  <p className="text-[11px] text-slate-600">
+                    Email: <code className="bg-emerald-50 px-1 rounded">{acc.email}</code>
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    Password: <code className="bg-emerald-50 px-1 rounded">{acc.password}</code>
                   </p>
                 </div>
               ))}

@@ -1,9 +1,11 @@
 import React from 'react';
 import DashboardMap from '../components/DashboardMap';
 import { useDevices } from '../services/useApi';
+import { useAuth } from '../context/AuthContext';
 
 const MapView: React.FC = () => {
-  const { data: devices, loading, error, refetch } = useDevices();
+  const { user } = useAuth();
+  const { data: devices, loading, error, refetch } = useDevices(user?.perusahaanId || undefined);
 
   if (loading) {
     return (

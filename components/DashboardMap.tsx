@@ -7,6 +7,7 @@ import { Filter, Calendar, ChevronDown, ChevronUp, Maximize2, Minimize2 } from '
 import { Device, RealtimeData } from '../types';
 import { useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
+import { useAuth } from '../context/AuthContext';
 
 // Voronoi tessellation using d3-delaunay (efficient implementation)
 const createVoronoiPolygons = (devices: Device[], bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
@@ -219,7 +220,8 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({
 const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
-  const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(undefined);
+  const { user } = useAuth();
+  const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(user?.perusahaanId || undefined);
   const { filters, updateFilter, enforcedProvinsi } = useFilters();
   
   const [legendOpen, setLegendOpen] = useState(false);

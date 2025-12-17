@@ -90,6 +90,9 @@ const Sidebar: React.FC = () => {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-700 truncate">{user?.name || 'Admin'}</p>
               <p className="text-xs text-slate-500 truncate">{user?.email || 'admin@example.com'}</p>
+              {user?.perusahaanName && (
+                <p className="text-[11px] text-emerald-700 truncate">{user.perusahaanName}</p>
+              )}
             </div>
           )}
         </div>

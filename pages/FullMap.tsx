@@ -5,6 +5,7 @@ import ChartContainer from '../components/charts/ChartContainer';
 import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { Device, RealtimeData } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 // Helper to normalize dates by week (Monday start)
 const getWeekStart = (date: string): string => {
@@ -26,6 +27,7 @@ const formatWeekLabel = (startDate: string): string => {
 const FullMap: React.FC = () => {
   const { t } = useTranslation();
   const { filters } = useFilters();
+  const { user } = useAuth();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
 
   const {
@@ -33,19 +35,19 @@ const FullMap: React.FC = () => {
     loading: devicesLoading,
     error: devicesError,
     refetch: refetchDevices,
-  } = useDevices();
+  } = useDevices(user?.perusahaanId || undefined);
   const {
     data: allPerusahaan,
     loading: perusahaanLoading,
     error: perusahaanError,
     refetch: refetchPerusahaan,
-  } = usePerusahaan();
+  } = usePerusahaan(user?.perusahaanId || undefined);
   const {
     data: realtimeData,
     loading: realtimeLoading,
     error: realtimeError,
     refetch: refetchRealtime,
-  } = useRealtimeAll(undefined);
+  } = useRealtimeAll(user?.perusahaanId || undefined);
 
   // Apply filters to device list
   const filteredDevices = useMemo(() => {

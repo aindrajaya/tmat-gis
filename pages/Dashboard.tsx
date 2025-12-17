@@ -6,16 +6,18 @@ import DashboardMap from '../components/DashboardMap';
 import FilterPanel from '../components/FilterPanel';
 import ChartContainer from '../components/charts/ChartContainer';
 import { Device, RealtimeData } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { filters } = useFilters();
+  const { user } = useAuth();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
   
   // Fetch data from API
-  const { data: allDevices, loading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices();
-  const { data: allPerusahaan, loading: perusahaanLoading, error: perusahaanError } = usePerusahaan();
-  const { data: realtimeData, loading: realtimeLoading, error: realtimeError, refetch: refetchRealtime } = useRealtimeAll(undefined);
+  const { data: allDevices, loading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices(user?.perusahaanId || undefined);
+  const { data: allPerusahaan, loading: perusahaanLoading, error: perusahaanError } = usePerusahaan(user?.perusahaanId || undefined);
+  const { data: realtimeData, loading: realtimeLoading, error: realtimeError, refetch: refetchRealtime } = useRealtimeAll(user?.perusahaanId || undefined);
   
   const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);

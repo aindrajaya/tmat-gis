@@ -3,7 +3,7 @@
  * Handles all HTTP requests to backend API (production and development)
  */
 
-import { Device, Perusahaan, RealtimeData } from '../types';
+import { Device, Perusahaan, PerusahaanWithDevices, RealtimeData } from '../types';
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -86,11 +86,61 @@ export class APIClient {
   }
 
   /**
+   * Normalize perusahaan + devices payload from various possible shapes
+   */
+  private normalizePerusahaanDevicesResponse(
+    response: any
+  ): PerusahaanWithDevices[] {
+    const perusahaanArray =
+      Array.isArray(response?.perusahaan) ? response.perusahaan : null;
+
+    const rawList =
+      (Array.isArray(response) && response) ||
+      perusahaanArray ||
+      response?.perusahaan_devices ||
+      response?.data ||
+      response?.master_perusahaan ||
+      response ||
+      [];
+
+    const list = Array.isArray(rawList) ? rawList : [rawList];
+
+    return list
+      .map((entry) => {
+        if (!entry) return null;
+
+        const perusahaanData =
+          entry.perusahaan ||
+          entry.company ||
+          entry.master_perusahaan ||
+          entry;
+
+        const devices =
+          entry.devices ||
+          entry.master_device ||
+          entry.device ||
+          entry.data_devices ||
+          entry.perusahaan_devices ||
+          entry.master_device_perusahaan ||
+          [];
+
+        if (!Array.isArray(devices)) return null;
+
+        return {
+          ...(perusahaanData as Perusahaan),
+          devices: devices as Device[],
+        };
+      })
+      .filter(Boolean) as PerusahaanWithDevices[];
+  }
+
+  /**
    * GET /perusahaan - Get all companies or single company by ID
    */
   async getPerusahaan(id?: number): Promise<Perusahaan[]> {
     const query = id ? `?id=${id}` : '';
-    return this.request<Perusahaan[]>(`/perusahaan${query}`);
+    const companies = await this.request<Perusahaan[]>(`/perusahaan${query}`);
+    return id ? companies.filter((company) => company.id === id) : companies;
   }
 
   /**
@@ -98,25 +148,92 @@ export class APIClient {
    */
   async getPerusahaanById(id: number): Promise<Perusahaan> {
     const companies = await this.getPerusahaan(id);
-    if (companies.length === 0) {
+    const matched = companies.find((company) => company.id === id);
+    if (!matched) {
       throw new Error(`Perusahaan with ID ${id} not found`);
     }
-    return companies[0];
+    return matched;
   }
 
   /**
-   * GET /device - Get all devices or single device by device_id
+   * GET /perusahaan/devices - Get devices grouped by perusahaan
+   * If perusahaanId is provided, API returns that perusahaan and its devices (404 if missing)
    */
-  async getDevice(deviceId?: string): Promise<Device[]> {
-    const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
-    return this.request<Device[]>(`/device${query}`);
+  async getPerusahaanDevices(
+    perusahaanId?: number
+  ): Promise<PerusahaanWithDevices[]> {
+    const query = perusahaanId ? `?id=${perusahaanId}` : '';
+    const response = await this.request<any>(`/perusahaan/devices${query}`);
+    const normalized = this.normalizePerusahaanDevicesResponse(response);
+
+    const scoped = perusahaanId
+      ? normalized
+          .filter((item) => item.id === perusahaanId)
+          .map((item) => ({
+            ...item,
+            devices: (item.devices || []).filter(
+              (device) => device.id_perusahaan === perusahaanId
+            ),
+          }))
+      : normalized;
+
+    if (!scoped.length && perusahaanId) {
+      throw new Error(
+        `Perusahaan with ID ${perusahaanId} not found or has no devices`
+      );
+    }
+
+    return scoped;
   }
 
   /**
-   * GET /device?device_id={deviceId} - Get specific device by device ID
+   * GET /perusahaan/devices - Get all devices (optionally scoped by perusahaan)
+   * Falls back to legacy /device when no perusahaanId is provided and new endpoint fails
    */
-  async getDeviceById(deviceId: string): Promise<Device> {
-    const devices = await this.getDevice(deviceId);
+  async getDevice(
+    deviceId?: string,
+    perusahaanId?: number
+  ): Promise<Device[]> {
+    try {
+      const perusahaanDevices = await this.getPerusahaanDevices(perusahaanId);
+      const devices = perusahaanDevices.flatMap((item) => item.devices || []);
+      const filteredDevices = deviceId
+        ? devices.filter((d) => d.device_id_unik === deviceId)
+        : devices;
+      const scopedDevices = perusahaanId
+        ? filteredDevices.filter((d) => d.id_perusahaan === perusahaanId)
+        : filteredDevices;
+
+      if (!perusahaanId && scopedDevices.length === 0) {
+        const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+        return this.request<Device[]>(`/device${query}`);
+      }
+
+      if (perusahaanId && scopedDevices.length === 0) {
+        throw new Error(
+          `Perusahaan with ID ${perusahaanId} not found or has no devices`
+        );
+      }
+
+      return scopedDevices;
+    } catch (error) {
+      // For unscoped requests, fall back to legacy /device endpoint to keep backward compatibility
+      if (!perusahaanId) {
+        const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+        return this.request<Device[]>(`/device${query}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get specific device by device ID (optionally scoped by perusahaan)
+   */
+  async getDeviceById(
+    deviceId: string,
+    perusahaanId?: number
+  ): Promise<Device> {
+    const devices = await this.getDevice(deviceId, perusahaanId);
     if (devices.length === 0) {
       throw new Error(`Device with ID ${deviceId} not found`);
     }

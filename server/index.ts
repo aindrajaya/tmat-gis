@@ -14,6 +14,27 @@ app.get('/api/portal_v1/perusahaan', (req, res) => {
   res.json({ master_perusahaan: MOCK_PERUSAHAAN });
 });
 
+// API: Get Perusahaan + Devices (new endpoint)
+app.get('/api/portal_v1/perusahaan/devices', (req, res) => {
+  const { id } = req.query;
+  const companyId = id ? Number(id) : null;
+
+  const companies = companyId
+    ? MOCK_PERUSAHAAN.filter((p) => p.id === companyId)
+    : MOCK_PERUSAHAAN;
+
+  if (companyId && companies.length === 0) {
+    return res.status(404).json({ message: 'Perusahaan not found' });
+  }
+
+  const payload = companies.map((company) => ({
+    ...company,
+    devices: MOCK_DEVICES.filter((d) => d.id_perusahaan === company.id),
+  }));
+
+  res.json(payload);
+});
+
 // API: Get All Devices
 app.get('/api/portal_v1/device', (req, res) => {
   const { device_id } = req.query;

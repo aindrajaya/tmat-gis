@@ -79,7 +79,7 @@ const Login: React.FC = () => {
               />
             </div>
             <h1 className="text-2xl font-bold text-slate-800 mb-2">
-              {isIndonesian ? 'Selamat Datang' : 'Welcome Back'}
+              {isIndonesian ? 'Selamat Datang Test' : 'Welcome Back Test'}
             </h1>
             <p className="text-slate-700 font-semibold text-sm mb-1">
               {isIndonesian 

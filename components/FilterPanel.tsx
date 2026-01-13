@@ -26,6 +26,7 @@ const FilterPanel: React.FC = () => {
     { label: t('forms:dateFilter.7days'), value: '7d' as const },
     { label: t('forms:dateFilter.14days'), value: '14d' as const },
     { label: t('forms:dateFilter.30days'), value: '30d' as const },
+    { label: 'Yearly', value: '365d' as const },
   ];
 
   return (
@@ -52,7 +53,7 @@ const FilterPanel: React.FC = () => {
         {/* Preset Buttons */}
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-600">{t('forms:dateFilter.quickSelect')}</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             {presetButtons.map(btn => (
               <button
                 key={btn.value}

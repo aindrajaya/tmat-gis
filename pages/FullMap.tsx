@@ -86,18 +86,24 @@ const FullMap: React.FC = () => {
   // Daily chart data
   const dailyChartData = useMemo(() => {
     if (relevantRealtimeData.length === 0) return [];
-    const dailyAggregation: Record<string, { safe: number; warning: number; danger: number }> = {};
+    const dailyAggregation: Record<string, { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
 
     relevantRealtimeData.forEach((r: RealtimeData) => {
       const date = r.timestamp_data.split(' ')[0];
       if (!dailyAggregation[date]) {
-        dailyAggregation[date] = { safe: 0, warning: 0, danger: 0 };
+        dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
       }
 
-      if (r.tmat_value < -0.4) {
-        dailyAggregation[date].danger++;
+      if (r.tmat_value < -0.6) {
+        dailyAggregation[date].extreme++;
+      } else if (r.tmat_value < -0.5) {
+        dailyAggregation[date].veryhigh++;
+      } else if (r.tmat_value < -0.4) {
+        dailyAggregation[date].high++;
       } else if (r.tmat_value < -0.2) {
-        dailyAggregation[date].warning++;
+        dailyAggregation[date].medium++;
+      } else if (r.tmat_value < 0) {
+        dailyAggregation[date].low++;
       } else {
         dailyAggregation[date].safe++;
       }
@@ -111,19 +117,25 @@ const FullMap: React.FC = () => {
   // Weekly chart data
   const weeklyChartData = useMemo(() => {
     if (relevantRealtimeData.length === 0) return [];
-    const weeklyAggregation: Record<string, { safe: number; warning: number; danger: number }> = {};
+    const weeklyAggregation: Record<string, { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
 
     relevantRealtimeData.forEach((r: RealtimeData) => {
       const date = r.timestamp_data.split(' ')[0];
       const weekStart = getWeekStart(date);
       if (!weeklyAggregation[weekStart]) {
-        weeklyAggregation[weekStart] = { safe: 0, warning: 0, danger: 0 };
+        weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
       }
 
-      if (r.tmat_value < -0.4) {
-        weeklyAggregation[weekStart].danger++;
+      if (r.tmat_value < -0.6) {
+        weeklyAggregation[weekStart].extreme++;
+      } else if (r.tmat_value < -0.5) {
+        weeklyAggregation[weekStart].veryhigh++;
+      } else if (r.tmat_value < -0.4) {
+        weeklyAggregation[weekStart].high++;
       } else if (r.tmat_value < -0.2) {
-        weeklyAggregation[weekStart].warning++;
+        weeklyAggregation[weekStart].medium++;
+      } else if (r.tmat_value < 0) {
+        weeklyAggregation[weekStart].low++;
       } else {
         weeklyAggregation[weekStart].safe++;
       }
@@ -152,7 +164,7 @@ const FullMap: React.FC = () => {
 
   // Metrics values
   const criticalCount = useMemo(
-    () => relevantRealtimeData.filter((r) => r.tmat_value < -0.4).length,
+    () => relevantRealtimeData.filter((r) => r.tmat_value < -0.6).length,
     [relevantRealtimeData]
   );
   const averageTemperature = useMemo(() => {

@@ -39,7 +39,7 @@ const parsePerusahaanPassword = (password: string): number | null => {
 
 const mockUsers: MockUser[] = [
   {
-    email: 'admin@menlhkproject.mail',
+    email: 'admin@menlh.mail',
     password: 'Admin12345',
     name: 'System Administrator',
     role: 'admin',

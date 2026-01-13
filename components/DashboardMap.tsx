@@ -93,37 +93,53 @@ const createWaterDropletIcon = (color: string = '#3b82f6', count?: number) => {
 // Water level status classification based on TMAT values
 // TMAT value indicates water level depth (negative = below surface)
 const getWaterLevelStatus = (tmatValue: number) => {
-  if (tmatValue >= -0.2) {
+  if (tmatValue >= 0) {
     return { 
-      level: 'Aman', 
-      color: '#10b981', 
-      range: '0 - 0.2 m',
-      description: 'Normal water level - Safe',
+      level: 'Tidak Beresiko', 
+      color: '#703CA0', 
+      range: '0 cm',
+      description: 'No risk - Safe',
       severity: 'safe'
+    };
+  } else if (tmatValue >= -0.2) {
+    return { 
+      level: 'Rendah', 
+      color: '#00B050', 
+      range: '0 - 20 cm',
+      description: 'Low water level - Safe',
+      severity: 'low'
     };
   } else if (tmatValue >= -0.4) {
     return { 
-      level: 'Peringatan', 
-      color: '#f59e0b', 
-      range: '0.2 - 0.4 m',
+      level: 'Sedang', 
+      color: '#00B0F0', 
+      range: '20 - 40 cm',
       description: 'Moderate water level - Warning',
-      severity: 'warning'
+      severity: 'medium'
     };
   } else if (tmatValue >= -0.6) {
     return { 
-      level: 'Bahaya', 
-      color: '#f97316', 
-      range: '0.4 - 0.6 m',
+      level: 'Tinggi', 
+      color: '#FFFF00', 
+      range: '40 - 60 cm',
       description: 'High water level - Danger',
-      severity: 'danger'
+      severity: 'high'
+    };
+  } else if (tmatValue >= -0.8) {
+    return { 
+      level: 'Sangat Tinggi', 
+      color: '#FFC000', 
+      range: '60 - 80 cm',
+      description: 'Very high water level - Emergency',
+      severity: 'veryhigh'
     };
   } else {
     return { 
-      level: 'Kritis', 
-      color: '#ef4444', 
-      range: '> 0.6 m',
-      description: 'Critical water level - Emergency',
-      severity: 'critical'
+      level: 'Ekstrim', 
+      color: '#EE0000', 
+      range: '> 80 cm',
+      description: 'Extreme water level - Critical',
+      severity: 'extreme'
     };
   }
 };
@@ -173,42 +189,62 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#10b981] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#703CA0] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Aman' : 'Safe'}
+                {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
               </p>
-              <p className="text-[10px] text-slate-500">TMAT ≥ -0.2</p>
+              <p className="text-[10px] text-slate-500">TMAT ≥ 0</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#f59e0b] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#00B050] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Peringatan' : 'Warning'}
+                {isIndonesian ? 'Rendah' : 'Low'}
               </p>
-              <p className="text-[10px] text-slate-500">-0.4 ≤ TMAT &lt; -0.2</p>
+              <p className="text-[10px] text-slate-500">0 - 20 cm</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#f97316] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#00B0F0] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Bahaya' : 'Danger'}
+                {isIndonesian ? 'Sedang' : 'Medium'}
               </p>
-              <p className="text-[10px] text-slate-500">-0.6 ≤ TMAT &lt; -0.4</p>
+              <p className="text-[10px] text-slate-500">20 - 40 cm</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#ef4444] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#FFFF00] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Kritis' : 'Critical'}
+                {isIndonesian ? 'Tinggi' : 'High'}
               </p>
-              <p className="text-[10px] text-slate-500">TMAT &lt; -0.6</p>
+              <p className="text-[10px] text-slate-500">40 - 60 cm</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#FFC000] flex-shrink-0"></div>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-700 text-xs">
+                {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
+              </p>
+              <p className="text-[10px] text-slate-500">60 - 80 cm</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-[#EE0000] flex-shrink-0"></div>
+            <div className="flex-1">
+              <p className="font-semibold text-slate-700 text-xs">
+                {isIndonesian ? 'Ekstrim' : 'Extreme'}
+              </p>
+              <p className="text-[10px] text-slate-500">{'> 80 cm'}</p>
             </div>
           </div>
         </div>
@@ -381,9 +417,11 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
       centerLng: number;
       stats: {
         safe: number;
-        warning: number;
-        danger: number;
-        critical: number;
+        low: number;
+        medium: number;
+        high: number;
+        veryhigh: number;
+        extreme: number;
         offline: number;
       };
     }>();
@@ -399,9 +437,11 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
           centerLng: 0,
           stats: {
             safe: 0,
-            warning: 0,
-            danger: 0,
-            critical: 0,
+            low: 0,
+            medium: 0,
+            high: 0,
+            veryhigh: 0,
+            extreme: 0,
             offline: 0
           }
         });
@@ -435,9 +475,11 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
   const stats = useMemo(() => {
     const statusCounts = {
       safe: 0,
-      warning: 0,
-      danger: 0,
-      critical: 0,
+      low: 0,
+      medium: 0,
+      high: 0,
+      veryhigh: 0,
+      extreme: 0,
       offline: 0
     };
 
@@ -709,17 +751,19 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
           const total = cityData.devices.length;
           const { stats } = cityData;
           
-          // Determine color based on most dominant status
+          // Determine color based on most dominant status (prioritize severity)
           let markerColor = '#06b6d4'; // default cyan
           const statusCounts = [
-            { color: '#10b981', count: stats.safe },      // green
-            { color: '#f59e0b', count: stats.warning },   // yellow
-            { color: '#f97316', count: stats.danger },    // orange
-            { color: '#ef4444', count: stats.critical },  // red
-            { color: '#94a3b8', count: stats.offline }    // gray
+            { color: '#EE0000', count: stats.extreme },     // red - extreme
+            { color: '#FFC000', count: stats.veryhigh },    // orange - very high
+            { color: '#FFFF00', count: stats.high },        // yellow - high
+            { color: '#00B0F0', count: stats.medium },      // light blue - medium
+            { color: '#00B050', count: stats.low },         // green - low
+            { color: '#703CA0', count: stats.safe },        // purple - no risk
+            { color: '#94a3b8', count: stats.offline }      // gray - offline
           ];
           
-          // Find the status with the highest count
+          // Find the status with the highest count (highest priority)
           const dominant = statusCounts.reduce((max, current) => 
             current.count > max.count ? current : max
           );
@@ -794,50 +838,74 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
                     </h4>
                     
                     {stats.safe > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
+                      </div>
+                    )}
+
+                    {stats.low > 0 && (
                       <div className="flex items-center justify-between p-2 bg-green-50 rounded">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+                          <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
                           <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Aman' : 'Safe'}
+                            {isIndonesian ? 'Rendah' : 'Low'}
                           </span>
                         </div>
-                        <span className="text-sm font-bold text-green-700">{stats.safe}</span>
+                        <span className="text-sm font-bold text-green-700">{stats.low}</span>
                       </div>
                     )}
 
-                    {stats.warning > 0 && (
+                    {stats.medium > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-cyan-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Sedang' : 'Medium'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
+                      </div>
+                    )}
+
+                    {stats.high > 0 && (
+                      <div className="flex items-center justify-between p-2 bg-yellow-50 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#FFFF00]"></div>
+                          <span className="text-xs font-medium text-slate-700">
+                            {isIndonesian ? 'Tinggi' : 'High'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-bold text-yellow-700">{stats.high}</span>
+                      </div>
+                    )}
+
+                    {stats.veryhigh > 0 && (
                       <div className="flex items-center justify-between p-2 bg-amber-50 rounded">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#f59e0b]"></div>
+                          <div className="w-3 h-3 rounded-full bg-[#FFC000]"></div>
                           <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Peringatan' : 'Warning'}
+                            {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
                           </span>
                         </div>
-                        <span className="text-sm font-bold text-amber-700">{stats.warning}</span>
+                        <span className="text-sm font-bold text-amber-700">{stats.veryhigh}</span>
                       </div>
                     )}
 
-                    {stats.danger > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#f97316]"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Bahaya' : 'Danger'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-orange-700">{stats.danger}</span>
-                      </div>
-                    )}
-
-                    {stats.critical > 0 && (
+                    {stats.extreme > 0 && (
                       <div className="flex items-center justify-between p-2 bg-red-50 rounded">
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
+                          <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
                           <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Kritis' : 'Critical'}
+                            {isIndonesian ? 'Ekstrim' : 'Extreme'}
                           </span>
                         </div>
-                        <span className="text-sm font-bold text-red-700">{stats.critical}</span>
+                        <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
                       </div>
                     )}
 
@@ -872,15 +940,17 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
           const firstDevice = groupDevices[0];
           const deviceCount = groupDevices.length;
           
-          // Get the most critical status in the group
+          // Get the most critical status in the group (prioritize severity)
           let mostCriticalColor = '#06b6d4';
           groupDevices.forEach(device => {
             const rtData = deviceDataMap.get(device.device_id_unik);
             if (rtData) {
               const status = getWaterLevelStatus(rtData.tmat_value);
-              if (status.severity === 'critical') mostCriticalColor = '#ef4444';
-              else if (status.severity === 'danger' && mostCriticalColor !== '#ef4444') mostCriticalColor = '#f97316';
-              else if (status.severity === 'warning' && mostCriticalColor === '#06b6d4') mostCriticalColor = '#f59e0b';
+              if (status.severity === 'extreme') mostCriticalColor = '#EE0000';
+              else if (status.severity === 'veryhigh' && mostCriticalColor !== '#EE0000') mostCriticalColor = '#FFC000';
+              else if (status.severity === 'high' && !['#EE0000', '#FFC000'].includes(mostCriticalColor)) mostCriticalColor = '#FFFF00';
+              else if (status.severity === 'medium' && !['#EE0000', '#FFC000', '#FFFF00'].includes(mostCriticalColor)) mostCriticalColor = '#00B0F0';
+              else if (status.severity === 'low' && !['#EE0000', '#FFC000', '#FFFF00', '#00B0F0'].includes(mostCriticalColor)) mostCriticalColor = '#00B050';
             }
           });
 
@@ -1079,24 +1149,28 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
             </svg>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
+                <div className="w-2 h-2 rounded-full bg-[#703CA0]"></div>
                 <span className="text-xs font-bold text-slate-700">{stats.safe}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.warning}</span>
+                <div className="w-2 h-2 rounded-full bg-[#00B050]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.low}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#f97316]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.danger}</span>
+                <div className="w-2 h-2 rounded-full bg-[#00B0F0]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.medium}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#ef4444]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.critical}</span>
+                <div className="w-2 h-2 rounded-full bg-[#FFFF00]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.high}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.offline}</span>
+                <div className="w-2 h-2 rounded-full bg-[#FFC000]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.veryhigh}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#EE0000]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.extreme}</span>
               </div>
             </div>
             <div className="pl-3 border-l border-slate-200">
@@ -1130,44 +1204,64 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
             </div>
             
             <div className="space-y-2">
-              <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Aman' : 'Safe'}
+                    {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-green-700">{stats.safe}</span>
+                <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Rendah' : 'Low'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-green-700">{stats.low}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 bg-cyan-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Sedang' : 'Medium'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#FFFF00]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Tinggi' : 'High'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-yellow-700">{stats.high}</span>
               </div>
 
               <div className="flex items-center justify-between p-2 bg-amber-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#f59e0b]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#FFC000]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Peringatan' : 'Warning'}
+                    {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-amber-700">{stats.warning}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 bg-orange-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#f97316]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Bahaya' : 'Danger'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-orange-700">{stats.danger}</span>
+                <span className="text-sm font-bold text-amber-700">{stats.veryhigh}</span>
               </div>
 
               <div className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Kritis' : 'Critical'}
+                    {isIndonesian ? 'Ekstrim' : 'Extreme'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-red-700">{stats.critical}</span>
+                <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
               </div>
 
               {stats.offline > 0 && (

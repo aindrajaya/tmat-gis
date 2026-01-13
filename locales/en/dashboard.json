@@ -40,6 +40,14 @@
     "safe": "Safe (> -0.4m)",
     "warning": "Warning",
     "danger": "Danger (< -0.8m)",
-    "tmatTrend": "TMAT Trend (Sample Devices)"
+    "tmatTrend": "TMAT Trend (Sample Devices)",
+    "download": "Download",
+    "downloadData": "Download Analytics Data",
+    "downloadDaily": "Download Daily Data (CSV)",
+    "downloadWeekly": "Download Weekly Data (CSV)",
+    "downloadDailyPDF": "Daily Report (PDF)",
+    "downloadWeeklyPDF": "Weekly Report (PDF)",
+    "downloadDailyExcel": "Daily Data (Excel)",
+    "downloadWeeklyExcel": "Weekly Data (Excel)"
   }
 }

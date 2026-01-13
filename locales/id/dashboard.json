@@ -40,6 +40,14 @@
     "safe": "Aman (> -0.4m)",
     "warning": "Peringatan",
     "danger": "Bahaya (< -0.8m)",
-    "tmatTrend": "Tren TMAT (Perangkat Sampel)"
+    "tmatTrend": "Tren TMAT (Perangkat Sampel)",
+    "download": "Unduh",
+    "downloadData": "Unduh Data Analitik",
+    "downloadDaily": "Unduh Data Harian (CSV)",
+    "downloadWeekly": "Unduh Data Mingguan (CSV)",
+    "downloadDailyPDF": "Laporan Harian (PDF)",
+    "downloadWeeklyPDF": "Laporan Mingguan (PDF)",
+    "downloadDailyExcel": "Data Harian (Excel)",
+    "downloadWeeklyExcel": "Data Mingguan (Excel)"
   }
 }

@@ -78,20 +78,26 @@ const Dashboard: React.FC = () => {
       }
 
       // DAILY AGGREGATION
-      const dailyAggregation: { [date: string]: { safe: number; warning: number; danger: number } } = {};
+      const dailyAggregation: { [date: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number } } = {};
       
       relevantData.forEach(r => {
         const date = r.timestamp_data.split(' ')[0]; // Extract date
         if (!dailyAggregation[date]) {
-          dailyAggregation[date] = { safe: 0, warning: 0, danger: 0 };
+          dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
         }
         
-        // Determine condition based on TMAT value (aligned with map classification)
-        // Critical: < -0.6, Danger: -0.6 to -0.4, Warning: -0.4 to -0.2, Safe: >= -0.2
-        if (r.tmat_value < -0.4) {
-          dailyAggregation[date].danger++; // Includes both danger and critical
+        // Determine condition based on TMAT value (6-level classification)
+        // Extreme: < -0.6, Very High: -0.6 to -0.5, High: -0.5 to -0.4, Medium: -0.4 to -0.2, Low: -0.2 to 0, Safe: >= 0
+        if (r.tmat_value < -0.6) {
+          dailyAggregation[date].extreme++;
+        } else if (r.tmat_value < -0.5) {
+          dailyAggregation[date].veryhigh++;
+        } else if (r.tmat_value < -0.4) {
+          dailyAggregation[date].high++;
         } else if (r.tmat_value < -0.2) {
-          dailyAggregation[date].warning++;
+          dailyAggregation[date].medium++;
+        } else if (r.tmat_value < 0) {
+          dailyAggregation[date].low++;
         } else {
           dailyAggregation[date].safe++;
         }
@@ -105,19 +111,25 @@ const Dashboard: React.FC = () => {
       setChartData(dailyChartArray.length > 0 ? dailyChartArray : []);
 
       // WEEKLY AGGREGATION
-      const weeklyAggregation: { [weekStart: string]: { safe: number; warning: number; danger: number } } = {};
+      const weeklyAggregation: { [weekStart: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number } } = {};
       
       relevantData.forEach(r => {
         const date = r.timestamp_data.split(' ')[0];
         const weekStart = getWeekStart(date);
         if (!weeklyAggregation[weekStart]) {
-          weeklyAggregation[weekStart] = { safe: 0, warning: 0, danger: 0 };
+          weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
         }
         
-        if (r.tmat_value < -0.4) {
-          weeklyAggregation[weekStart].danger++;
+        if (r.tmat_value < -0.6) {
+          weeklyAggregation[weekStart].extreme++;
+        } else if (r.tmat_value < -0.5) {
+          weeklyAggregation[weekStart].veryhigh++;
+        } else if (r.tmat_value < -0.4) {
+          weeklyAggregation[weekStart].high++;
         } else if (r.tmat_value < -0.2) {
-          weeklyAggregation[weekStart].warning++;
+          weeklyAggregation[weekStart].medium++;
+        } else if (r.tmat_value < 0) {
+          weeklyAggregation[weekStart].low++;
         } else {
           weeklyAggregation[weekStart].safe++;
         }

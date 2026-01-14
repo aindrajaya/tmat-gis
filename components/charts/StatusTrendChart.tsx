@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -6,7 +6,7 @@ interface StatusTrendChartProps {
   data: any[];
 }
 
-const StatusTrendChart: React.FC<StatusTrendChartProps> = ({ data }) => {
+const StatusTrendChart = forwardRef<HTMLDivElement, StatusTrendChartProps>(({ data }, ref) => {
   const { t } = useTranslation();
 
   const CustomTooltip = (props: any) => {
@@ -27,12 +27,20 @@ const StatusTrendChart: React.FC<StatusTrendChartProps> = ({ data }) => {
   };
 
   return (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
+    <div ref={ref} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-100">
       <h3 className="font-semibold text-slate-700 mb-4">{t('dashboard:charts.statusTrend')}</h3>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="date" fontSize={12} />
+          <XAxis
+            dataKey="date"
+            fontSize={10}
+            angle={-90}
+            textAnchor="end"
+            height={80}
+            interval={0}
+            tick={{ dy: -5 }}
+          />
           <YAxis fontSize={12} />
           <RechartsTooltip content={<CustomTooltip />} />
           <Legend />
@@ -46,6 +54,8 @@ const StatusTrendChart: React.FC<StatusTrendChartProps> = ({ data }) => {
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+StatusTrendChart.displayName = 'StatusTrendChart';
 
 export default StatusTrendChart;

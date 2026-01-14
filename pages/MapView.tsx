@@ -1,11 +1,47 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import DashboardMap from '../components/DashboardMap';
-import { useDevices } from '../services/useApi';
+import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
+import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
 
 const MapView: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
-  const { data: devices, loading, error, refetch } = useDevices(user?.perusahaanId || undefined);
+  const { filters } = useFilters();
+  const { data: allDevices, loading: devicesLoading, error: devicesError, refetch } = useDevices(user?.perusahaanId || undefined);
+  const { data: allPerusahaan, loading: perusahaanLoading } = usePerusahaan(user?.perusahaanId || undefined);
+  const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(user?.perusahaanId || undefined);
+
+  // Apply filters to device list
+  const filteredDevices = useMemo(() => {
+    if (!allDevices) return [];
+
+    let filtered = allDevices;
+    if (filters.provinsi) {
+      filtered = filtered.filter((d) => d.provinsi === filters.provinsi);
+    }
+    if (filters.kabupaten) {
+      filtered = filtered.filter((d) => d.kabupaten === filters.kabupaten);
+    }
+    if (filters.jenis_perusahaan && allPerusahaan) {
+      const companyIds = allPerusahaan
+        .filter((p) => p.jenis_perusahaan === filters.jenis_perusahaan)
+        .map((p) => p.id);
+      filtered = filtered.filter((d) => companyIds.includes(d.id_perusahaan));
+    }
+    return filtered;
+  }, [allDevices, allPerusahaan, filters]);
+
+  // Critical TMAT count based on filtered devices
+  const criticalCount = useMemo(() => {
+    if (!realtimeData || filteredDevices.length === 0) return 0;
+    const deviceIds = filteredDevices.map(d => d.device_id_unik);
+    return realtimeData.filter(r => deviceIds.includes(r.device_id_unik) && r.tmat_value < -0.4).length;
+  }, [realtimeData, filteredDevices]);
+
+  const loading = devicesLoading || perusahaanLoading || realtimeLoading;
+  const error = devicesError;
 
   if (loading) {
     return (
@@ -40,8 +76,8 @@ const MapView: React.FC = () => {
   }
 
   return (
-    <div className="p-6 h-full">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-6 h-full space-y-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Map</h1>
           <p className="text-sm text-slate-500">Map-only view with filters, stats, and legend inside the map.</p>
@@ -53,8 +89,36 @@ const MapView: React.FC = () => {
           Refresh devices
         </button>
       </div>
-      <div className="h-[calc(100vh-200px)]">
-        <DashboardMap devices={devices || []} />
+
+      {/* Location Filter Display */}
+      {(filters.provinsi || filters.kabupaten) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
+          <p className="text-sm text-blue-700 font-medium">
+            {t('dashboard:metrics.filteredLocation')}: {filters.provinsi}{filters.kabupaten ? ` > ${filters.kabupaten}` : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-sm text-slate-500">{t('dashboard:metrics.totalStations')}</p>
+          <p className="text-2xl font-bold text-slate-800">{filteredDevices.length}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-sm text-slate-500">{t('dashboard:metrics.active')}</p>
+          <p className="text-2xl font-bold text-emerald-600">
+            {filteredDevices.filter(d => d.status === 'aktif').length}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-sm text-slate-500">{t('dashboard:metrics.criticalLowTmat')}</p>
+          <p className="text-2xl font-bold text-rose-600">{criticalCount}</p>
+        </div>
+      </div>
+
+      <div className="h-[calc(100vh-350px)]">
+        <DashboardMap devices={filteredDevices} />
       </div>
     </div>
   );

@@ -162,16 +162,11 @@ const FullMap: React.FC = () => {
     }));
   }, [relevantRealtimeData]);
 
-  // Metrics values
+  // Metrics values - Critical TMAT count based on filtered devices
   const criticalCount = useMemo(
-    () => relevantRealtimeData.filter((r) => r.tmat_value < -0.6).length,
+    () => relevantRealtimeData.filter((r) => r.tmat_value < -0.4).length,
     [relevantRealtimeData]
   );
-  const averageTemperature = useMemo(() => {
-    if (!relevantRealtimeData.length) return '0';
-    const total = relevantRealtimeData.reduce((sum, r) => sum + (r.suhu_value || 0), 0);
-    return (total / relevantRealtimeData.length).toFixed(1);
-  }, [relevantRealtimeData]);
 
   const isLoading = devicesLoading || perusahaanLoading || realtimeLoading;
   const hasError = devicesError || perusahaanError || realtimeError;
@@ -224,12 +219,17 @@ const FullMap: React.FC = () => {
           </p>
         </div>
 
-        <section className="space-y-3">
-          <DashboardMap devices={filteredDevices} heightClass="h-[70vh]" />
-        </section>
+        {/* Location Filter Display */}
+        {(filters.provinsi || filters.kabupaten) && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
+            <p className="text-sm text-blue-700 font-medium">
+              {t('dashboard:metrics.filteredLocation')}: {filters.provinsi}{filters.kabupaten ? ` > ${filters.kabupaten}` : ''}
+            </p>
+          </div>
+        )}
 
         {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-sm text-slate-500">{t('dashboard:metrics.totalStations')}</p>
             <p className="text-2xl font-bold text-slate-800">{filteredDevices.length}</p>
@@ -244,11 +244,11 @@ const FullMap: React.FC = () => {
             <p className="text-sm text-slate-500">{t('dashboard:metrics.criticalLowTmat')}</p>
             <p className="text-2xl font-bold text-rose-600">{criticalCount}</p>
           </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-sm text-slate-500">{t('dashboard:metrics.avgTemperature')}</p>
-            <p className="text-2xl font-bold text-amber-500">{averageTemperature}°C</p>
-          </div>
         </div>
+
+        <section className="space-y-3">
+          <DashboardMap devices={filteredDevices} heightClass="h-[70vh]" />
+        </section>
 
         {/* Charts */}
         <ChartContainer

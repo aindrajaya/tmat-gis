@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -7,7 +7,7 @@ interface BarChartConditionProps {
   chartView: 'daily' | 'weekly';
 }
 
-const BarChartCondition: React.FC<BarChartConditionProps> = ({ data, chartView }) => {
+const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ data, chartView }, ref) => {
   const { t } = useTranslation();
 
   // Convert counts to percentages
@@ -55,16 +55,24 @@ const BarChartCondition: React.FC<BarChartConditionProps> = ({ data, chartView }
   };
 
   return (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-80">
+    <div ref={ref} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-100">
       <h3 className="font-semibold text-slate-700 mb-4">
-        {chartView === 'daily' 
+        {chartView === 'daily'
           ? t('dashboard:charts.dailyTmatCondition')
           : t('dashboard:charts.weeklyTmatCondition')}
       </h3>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={320}>
         <BarChart data={percentageData}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="date" fontSize={12} />
+          <XAxis
+            dataKey="date"
+            fontSize={10}
+            angle={-90}
+            textAnchor="end"
+            height={80}
+            interval={0}
+            tick={{ dy: -5 }}
+          />
           <YAxis fontSize={12} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
           <RechartsTooltip content={<CustomTooltip />} />
           <Legend />
@@ -78,6 +86,8 @@ const BarChartCondition: React.FC<BarChartConditionProps> = ({ data, chartView }
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+BarChartCondition.displayName = 'BarChartCondition';
 
 export default BarChartCondition;

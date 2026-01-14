@@ -22,10 +22,10 @@
     }
   },
   "metrics": {
+    "filteredLocation": "Filtered Location",
     "totalStations": "Total Stations",
     "active": "Active",
-    "criticalLowTmat": "Critical Low TMAT",
-    "avgTemperature": "Avg Temperature"
+    "criticalLowTmat": "Critical Low TMAT"
   },
   "map": {
     "stationDistribution": "Station Distribution Map"
@@ -48,6 +48,9 @@
     "downloadDailyPDF": "Daily Report (PDF)",
     "downloadWeeklyPDF": "Weekly Report (PDF)",
     "downloadDailyExcel": "Daily Data (Excel)",
-    "downloadWeeklyExcel": "Weekly Data (Excel)"
+    "downloadWeeklyExcel": "Weekly Data (Excel)",
+    "downloadDailyPDFGraphics": "Daily with Graphics (PDF)",
+    "downloadWeeklyPDFGraphics": "Weekly with Graphics (PDF)",
+    "exporting": "Exporting..."
   }
 }

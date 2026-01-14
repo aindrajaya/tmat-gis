@@ -298,6 +298,34 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
     }
   };
 
+  // Function to capture map with exact aspect ratio and dimensions
+  const captureMapElement = async (element: HTMLElement | null): Promise<{ dataUrl: string; width: number; height: number } | null> => {
+    if (!element) return null;
+    try {
+      // Add slight delay to ensure map is fully rendered
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: element.offsetWidth,
+        windowHeight: element.offsetHeight,
+      });
+      
+      return {
+        dataUrl: canvas.toDataURL('image/png'),
+        width: canvas.width,
+        height: canvas.height
+      };
+    } catch (error) {
+      console.error('Error capturing map element:', error);
+      return null;
+    }
+  };
+
   // Function to download PDF with graphics (map + charts + table)
   // Page 1: Map only, Page 2: Charts only, Page 3: Data Table
   const downloadPDFWithGraphics = async (data: any[], type: 'daily' | 'weekly') => {
@@ -332,13 +360,18 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       doc.setTextColor(30, 41, 59);
       doc.text('Station Distribution Map', margin, 32);
 
-      // Capture and add map image (larger on dedicated page)
+      // Capture and add map image (full width, height follows exact aspect ratio)
       if (mapRef?.current) {
-        const mapImage = await captureElement(mapRef.current);
+        const mapImage = await captureMapElement(mapRef.current);
         if (mapImage) {
+          // Use full available width
           const mapWidth = pageWidth - (margin * 2);
-          const mapHeight = pageHeight - 50; // Use most of page height
-          doc.addImage(mapImage, 'PNG', margin, 38, mapWidth, mapHeight);
+          
+          // Calculate height from exact aspect ratio of captured image
+          const aspectRatio = mapImage.width / mapImage.height;
+          const mapHeight = mapWidth / aspectRatio;
+          
+          doc.addImage(mapImage.dataUrl, 'PNG', margin, 38, mapWidth, mapHeight);
         }
       }
 

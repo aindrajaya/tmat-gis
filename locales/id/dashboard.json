@@ -22,10 +22,10 @@
     }
   },
   "metrics": {
+    "filteredLocation": "Lokasi Filter",
     "totalStations": "Total Stasiun",
     "active": "Aktif",
-    "criticalLowTmat": "TMAT Rendah Kritis",
-    "avgTemperature": "Suhu Rata-rata"
+    "criticalLowTmat": "TMAT Rendah Kritis"
   },
   "map": {
     "stationDistribution": "Peta Distribusi Stasiun"
@@ -48,6 +48,9 @@
     "downloadDailyPDF": "Laporan Harian (PDF)",
     "downloadWeeklyPDF": "Laporan Mingguan (PDF)",
     "downloadDailyExcel": "Data Harian (Excel)",
-    "downloadWeeklyExcel": "Data Mingguan (Excel)"
+    "downloadWeeklyExcel": "Data Mingguan (Excel)",
+    "downloadDailyPDFGraphics": "Harian dengan Grafik (PDF)",
+    "downloadWeeklyPDFGraphics": "Mingguan dengan Grafik (PDF)",
+    "exporting": "Mengekspor..."
   }
 }

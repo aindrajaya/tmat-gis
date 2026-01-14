@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -253,7 +253,7 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({
   );
 };
 
-const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
+const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }, ref) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { user } = useAuth();
@@ -502,7 +502,7 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
   const containerHeight = heightClass || (isExpanded ? 'h-[800px]' : 'h-[500px]');
 
   return (
-    <div className={`${containerHeight} w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative transition-all duration-300`}>
+    <div ref={ref} className={`${containerHeight} w-full rounded-xl overflow-hidden shadow-sm border border-slate-200 relative transition-all duration-300`}>
       {/* Filter Panel - Top of Map */}
       <div className="absolute top-3 left-12 right-4 z-[1000]">
         {/* Filter Toggle Button */}
@@ -1344,6 +1344,8 @@ const DashboardMap: React.FC<Props> = ({ devices, heightClass }) => {
       </div>
     </div>
   );
-};
+});
+
+DashboardMap.displayName = 'DashboardMap';
 
 export default DashboardMap;

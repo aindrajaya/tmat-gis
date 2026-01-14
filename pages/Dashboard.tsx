@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFilters } from '../context/FilterContext';
 import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
@@ -13,6 +13,12 @@ const Dashboard: React.FC = () => {
   const { filters } = useFilters();
   const { user } = useAuth();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
+
+  // Refs for capturing graphics in PDF export
+  const mapRef = useRef<HTMLDivElement>(null);
+  const barChartRef = useRef<HTMLDivElement>(null);
+  const statusTrendRef = useRef<HTMLDivElement>(null);
+  const tmatTrendRef = useRef<HTMLDivElement>(null);
   
   // Fetch data from API
   const { data: allDevices, loading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices(user?.perusahaanId || undefined);
@@ -203,11 +209,20 @@ const Dashboard: React.FC = () => {
       {/* Map Section */}
       <section className="space-y-3">
         <h2 className="text-lg font-bold text-slate-800">{t('dashboard:map.stationDistribution')}</h2>
-        <DashboardMap devices={filteredDevices} />
+        <DashboardMap ref={mapRef} devices={filteredDevices} />
       </section>
 
+      {/* Location Filter Display */}
+      {(filters.provinsi || filters.kabupaten) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
+          <p className="text-sm text-blue-700 font-medium">
+            {t('dashboard:metrics.filteredLocation')}: {filters.provinsi}{filters.kabupaten ? ` > ${filters.kabupaten}` : ''}
+          </p>
+        </div>
+      )}
+
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-sm text-slate-500">{t('dashboard:metrics.totalStations')}</p>
           <p className="text-2xl font-bold text-slate-800">{filteredDevices.length}</p>
@@ -221,16 +236,10 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-sm text-slate-500">{t('dashboard:metrics.criticalLowTmat')}</p>
           <p className="text-2xl font-bold text-rose-600">
-            {realtimeData?.filter(r => r.tmat_value < -0.4).length || 0}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-sm text-slate-500">{t('dashboard:metrics.avgTemperature')}</p>
-          <p className="text-2xl font-bold text-amber-500">
-            {realtimeData && realtimeData.length > 0
-              ? (realtimeData.reduce((sum, r) => sum + (r.suhu_value || 0), 0) / realtimeData.length).toFixed(1)
-              : '0'}
-            °C
+            {realtimeData?.filter(r => {
+              const deviceIds = filteredDevices.map(d => d.device_id_unik);
+              return deviceIds.includes(r.device_id_unik) && r.tmat_value < -0.4;
+            }).length || 0}
           </p>
         </div>
       </div>
@@ -239,12 +248,16 @@ const Dashboard: React.FC = () => {
       <FilterPanel />
 
       {/* Charts Section */}
-      <ChartContainer 
+      <ChartContainer
         chartView={chartView}
         setChartView={setChartView}
         dailyData={chartData}
         weeklyData={weeklyChartData}
         trendData={trendData}
+        mapRef={mapRef}
+        barChartRef={barChartRef}
+        statusTrendRef={statusTrendRef}
+        tmatTrendRef={tmatTrendRef}
       />
     </div>
   );

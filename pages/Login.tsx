@@ -51,7 +51,21 @@ const Login: React.FC = () => {
 
   const copyToClipboard = async (text: string, type: 'email' | 'password') => {
     try {
-      await navigator.clipboard.writeText(text);
+      // Try modern clipboard API first (requires HTTPS)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for HTTP or older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      
       if (type === 'email') {
         setCopiedEmail(true);
         setTimeout(() => setCopiedEmail(false), 2000);

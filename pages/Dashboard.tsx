@@ -245,7 +245,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Filter Panel */}
-      <FilterPanel />
+      {/* <FilterPanel /> */}
 
       {/* Charts Section */}
       <ChartContainer

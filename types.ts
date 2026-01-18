@@ -55,8 +55,11 @@ export interface DashboardSummary {
 export interface FilterState {
   provinsi: string;
   kabupaten: string;
+  kecamatan: string;
+  desa: string;
   jenis_perusahaan: string;
   startDate: string;
   endDate: string;
   timePeriod?: 'today' | '7d' | '14d' | '30d' | 'custom';
+  searchText?: string;
 }

@@ -1,12 +1,32 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, ChevronDown, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useRealtimeAll, useDevices } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
+import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
+
+// Memoized table row component to prevent unnecessary re-renders
+interface TableRowProps {
+  row: any;
+  t: any;
+}
+
+const TableRow = memo(({ row, t }: TableRowProps) => (
+  <tr className="hover:bg-slate-50 transition-colors">
+    <td className="px-6 py-3 font-medium">{row.timestamp_data}</td>
+    <td className="px-6 py-3 text-emerald-700">{row.device_id_unik}</td>
+    <td className="px-6 py-3">{row.location}</td>
+    <td className={`px-6 py-3 text-right font-bold ${row.tmat_value < -0.4 ? 'text-red-600' : 'text-slate-700'}`}>
+      {row.tmat_value}
+    </td>
+    <td className="px-6 py-3 text-right">{row.suhu_value}</td>
+    <td className="px-6 py-3 text-right">{row.ph_value}</td>
+  </tr>
+));
 
 const RawData: React.FC = () => {
   const { t } = useTranslation();
@@ -17,119 +37,109 @@ const RawData: React.FC = () => {
   const { data: realtimeData, loading, error, refetch } = useRealtimeAll(user?.perusahaanId || undefined);
   const { data: devices } = useDevices(user?.perusahaanId || undefined);
   
-  const [tableData, setTableData] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
-  const [selectedProvince, setSelectedProvince] = useState<string>('');
-  const [selectedCity, setSelectedCity] = useState<string>('');
-  const [filterStartDate, setFilterStartDate] = useState<string>('');
-  const [filterEndDate, setFilterEndDate] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
   const pageSize = 50;
 
-  // Prepare table data: Join realtime with device info
-  useEffect(() => {
-    if (!realtimeData || !devices) return;
+  // Prepare table data: Join realtime with device info (memoized for performance)
+  const tableData = useMemo(() => {
+    if (!realtimeData || !devices) return [];
 
-    let filteredData = realtimeData;
+    // Create device lookup map for O(1) lookups instead of O(n) array searches
+    const deviceById = new Map(devices.map(d => [d.device_id_unik, d]));
 
     // Province gate: drop records outside enforced or selected province
     const targetProv = enforcedProvinsi || filters.provinsi;
-    if (targetProv) {
-      const deviceById = new Map(devices.map(d => [d.device_id_unik, d]));
-      filteredData = filteredData.filter(rt => {
+    
+    return realtimeData
+      // Province filter
+      .filter(rt => {
+        if (!targetProv) return true;
         const device = deviceById.get(rt.device_id_unik);
         return device ? device.provinsi === targetProv : false;
-      });
-    }
-
-    // Apply date filters if set
-    if (filters.startDate || filters.endDate) {
-      filteredData = filteredData.filter(rt => {
+      })
+      // Date range filter
+      .filter(rt => {
+        if (!filters.startDate && !filters.endDate) return true;
         const dataDate = rt.timestamp_data.split(' ')[0]; // Extract YYYY-MM-DD
         const matchesStart = !filters.startDate || dataDate >= filters.startDate;
         const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
         return matchesStart && matchesEnd;
+      })
+      // Enrich with device data
+      .map(rt => {
+        const device = deviceById.get(rt.device_id_unik);
+        return {
+          ...rt,
+          device: device,
+          location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
+        };
       });
-    }
+  }, [realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
 
-    const data = filteredData.map(rt => {
-      const device = devices.find(d => d.device_id_unik === rt.device_id_unik);
-      return {
-        ...rt,
-        location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
-      };
-    });
+  // Reset to first page when base table data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tableData]);
 
-    setTableData(data);
-    setCurrentPage(1); // Reset to first page when data changes
-  }, [realtimeData, devices, filters.startDate, filters.endDate]);
-
-  // Get unique provinces and cities from all data
-  const allData = useMemo(() => {
-    if (!realtimeData || !devices) return [];
-    return realtimeData.map(rt => {
-      const device = devices.find(d => d.device_id_unik === rt.device_id_unik);
-      return {
-        ...rt,
-        provinsi: device?.provinsi || 'Unknown',
-        kota: device?.kota || 'Unknown',
-        location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
-      };
-    });
-  }, [realtimeData, devices]);
-
-  const uniqueProvinces = useMemo(() => {
-    const provinces = new Set(allData.map(d => d.provinsi));
-    return Array.from(provinces).sort();
-  }, [allData]);
-
-  const uniqueCities = useMemo(() => {
-    if (!selectedProvince) return [];
-    const cities = new Set(allData.filter(d => d.provinsi === selectedProvince).map(d => d.kota));
-    return Array.from(cities).sort();
-  }, [allData, selectedProvince]);
-
-  // Apply local filters
+  // Apply local filters from context (memoized to only recompute when filters change)
   const filteredData = useMemo(() => {
-    let result = tableData;
+    // Early exit if no base data
+    if (!tableData || tableData.length === 0) return [];
 
-    // Filter by province
-    if (selectedProvince) {
-      result = result.filter(row => {
-        const device = devices?.find(d => d.device_id_unik === row.device_id_unik);
-        return device?.provinsi === selectedProvince;
-      });
-    }
+    return tableData.filter(row => {
+      // Filter by kabupaten (city)
+      if (filters.kabupaten && row.device?.kabupaten !== filters.kabupaten) {
+        return false;
+      }
 
-    // Filter by city
-    if (selectedCity) {
-      result = result.filter(row => {
-        const device = devices?.find(d => d.device_id_unik === row.device_id_unik);
-        return device?.kota === selectedCity;
-      });
-    }
+      // Filter by kecamatan
+      if (filters.kecamatan && row.device?.kota !== filters.kecamatan) {
+        return false;
+      }
 
-    // Filter by date range
-    if (filterStartDate || filterEndDate) {
-      result = result.filter(row => {
-        const dataDate = row.timestamp_data.split(' ')[0];
-        const matchesStart = !filterStartDate || dataDate >= filterStartDate;
-        const matchesEnd = !filterEndDate || dataDate <= filterEndDate;
-        return matchesStart && matchesEnd;
-      });
-    }
+      // Filter by desa
+      if (filters.desa && !(row.device?.alamat?.toLowerCase().includes(filters.desa.toLowerCase()))) {
+        return false;
+      }
 
-    return result;
-  }, [tableData, selectedProvince, selectedCity, filterStartDate, filterEndDate, devices]);
+      // Filter by company type
+      if (filters.jenis_perusahaan && row.device?.id_perusahaan.toString() !== filters.jenis_perusahaan) {
+        return false;
+      }
 
-  // Paginate table data
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+      // Apply search filter
+      if (filters.searchText) {
+        const searchLower = filters.searchText.toLowerCase();
+        const matchesId = row.device_id_unik.toLowerCase().includes(searchLower);
+        const matchesLocation = row.location.toLowerCase().includes(searchLower);
+        const matchesKota = row.device?.kota?.toLowerCase().includes(searchLower);
+        const matchesProvinsi = row.device?.provinsi?.toLowerCase().includes(searchLower);
+        const matchesAlamat = row.device?.alamat?.toLowerCase().includes(searchLower);
+        
+        if (!(matchesId || matchesLocation || matchesKota || matchesProvinsi || matchesAlamat)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText]);
+
+  // Paginate table data (memoized to avoid unnecessary slice operations)
+  const paginatedData = useMemo(() => {
+    return filteredData.slice(
+      (currentPage - 1) * pageSize,
+      currentPage * pageSize
+    );
+  }, [filteredData, currentPage, pageSize]);
+
+  // Calculate total pages (memoized)
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredData.length / pageSize);
+  }, [filteredData.length, pageSize]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -142,8 +152,8 @@ const RawData: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Export to CSV
-  const exportToCSV = () => {
+  // Memoized export handlers to prevent unnecessary function recreation
+  const exportToCSV = useCallback(() => {
     if (filteredData.length === 0) return;
 
     const headers = ['Timestamp', 'Device ID', 'Location', 'TMAT (m)', 'Temperature (°C)', 'pH'];
@@ -170,10 +180,10 @@ const RawData: React.FC = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
-  };
+  }, [filteredData]);
 
   // Export to PDF
-  const exportToPDF = () => {
+  const exportToPDF = useCallback(() => {
     if (filteredData.length === 0) return;
 
     const doc = new jsPDF('landscape', 'mm', 'a4');
@@ -193,14 +203,18 @@ const RawData: React.FC = () => {
 
     // Add filter info if applied
     let filterY = 28;
-    if (selectedProvince || selectedCity || filterStartDate || filterEndDate) {
+    if (filters.provinsi || filters.kabupaten || filters.kecamatan || filters.desa || filters.jenis_perusahaan || filters.searchText || filters.startDate || filters.endDate) {
       doc.setFontSize(9);
       doc.setTextColor(107, 114, 128);
       const filterInfo = [
-        selectedProvince ? `Province: ${selectedProvince}` : null,
-        selectedCity ? `City: ${selectedCity}` : null,
-        filterStartDate ? `From: ${filterStartDate}` : null,
-        filterEndDate ? `To: ${filterEndDate}` : null
+        filters.provinsi ? `Province: ${filters.provinsi}` : null,
+        filters.kabupaten ? `Regency: ${filters.kabupaten}` : null,
+        filters.kecamatan ? `District: ${filters.kecamatan}` : null,
+        filters.desa ? `Village: ${filters.desa}` : null,
+        filters.jenis_perusahaan ? `Type: ${filters.jenis_perusahaan}` : null,
+        filters.searchText ? `Search: ${filters.searchText}` : null,
+        filters.startDate ? `From: ${filters.startDate}` : null,
+        filters.endDate ? `To: ${filters.endDate}` : null
       ].filter(Boolean).join(' | ');
       doc.text(`Filters: ${filterInfo}`, margin, filterY);
       filterY += 6;
@@ -255,10 +269,10 @@ const RawData: React.FC = () => {
 
     doc.save(`raw-data-${new Date().toISOString().split('T')[0]}.pdf`);
     setShowExportMenu(false);
-  };
+  }, [filteredData, filters]);
 
   // Export to Excel
-  const exportToExcel = () => {
+  const exportToExcel = useCallback(() => {
     if (filteredData.length === 0) return;
 
     const excelData = filteredData.map(row => ({
@@ -286,7 +300,7 @@ const RawData: React.FC = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Raw Data');
     XLSX.writeFile(workbook, `raw-data-${new Date().toISOString().split('T')[0]}.xlsx`);
     setShowExportMenu(false);
-  };
+  }, [filteredData]);
 
   // Handle loading state
   if (loading) {
@@ -366,96 +380,23 @@ const RawData: React.FC = () => {
         </div>
         
         {/* Filter Section */}
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <div className="px-6 py-3 border-b border-slate-100 bg-slate-50">
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition"
+            onClick={() => setFilterOpen(true)}
+            className="flex items-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 px-3 py-2 rounded-lg transition"
           >
-            <ChevronDown size={18} className={`transform transition ${showFilters ? 'rotate-180' : ''}`} />
-            Filters
-            {(selectedProvince || selectedCity || filterStartDate || filterEndDate) && (
-              <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                {[selectedProvince, selectedCity, filterStartDate, filterEndDate].filter(Boolean).length} active
+            <Filter size={18} />
+            {t('common:buttons.filter', 'Filters')}
+            {(filters.provinsi || filters.kabupaten || filters.kecamatan || filters.desa || filters.jenis_perusahaan || filters.searchText) && (
+              <span className="ml-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-bold">
+                {[filters.provinsi, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText].filter(Boolean).length}
               </span>
             )}
           </button>
-
-          {showFilters && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Province Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Province</label>
-                <select
-                  value={selectedProvince}
-                  onChange={(e) => {
-                    setSelectedProvince(e.target.value);
-                    setSelectedCity(''); // Reset city when province changes
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Provinces</option>
-                  {uniqueProvinces.map(province => (
-                    <option key={province} value={province}>{province}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* City Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">City</label>
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  disabled={!selectedProvince}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">All Cities</option>
-                  {uniqueCities.map(city => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Start Date Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
-                <input
-                  type="date"
-                  value={filterStartDate}
-                  onChange={(e) => setFilterStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* End Date Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">End Date</label>
-                <input
-                  type="date"
-                  value={filterEndDate}
-                  onChange={(e) => setFilterEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Reset Filters Button */}
-          {(selectedProvince || selectedCity || filterStartDate || filterEndDate) && (
-            <button
-              onClick={() => {
-                setSelectedProvince('');
-                setSelectedCity('');
-                setFilterStartDate('');
-                setFilterEndDate('');
-                setCurrentPage(1);
-              }}
-              className="mt-3 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition"
-            >
-              Clear Filters
-            </button>
-          )}
         </div>
+
+        {/* Advanced Filter Panel Modal */}
+        <AdvancedFilterPanel isOpen={filterOpen} onClose={() => setFilterOpen(false)} />
         
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
@@ -472,16 +413,7 @@ const RawData: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {paginatedData.length > 0 ? (
                 paginatedData.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-3 font-medium">{row.timestamp_data}</td>
-                    <td className="px-6 py-3 text-emerald-700">{row.device_id_unik}</td>
-                    <td className="px-6 py-3">{row.location}</td>
-                    <td className={`px-6 py-3 text-right font-bold ${row.tmat_value < -0.4 ? 'text-red-600' : 'text-slate-700'}`}>
-                      {row.tmat_value}
-                    </td>
-                    <td className="px-6 py-3 text-right">{row.suhu_value}</td>
-                    <td className="px-6 py-3 text-right">{row.ph_value}</td>
-                  </tr>
+                  <TableRow key={row.id} row={row} t={t} />
                 ))
               ) : (
                 <tr>
@@ -494,6 +426,7 @@ const RawData: React.FC = () => {
           </table>
         </div>
         
+        {/* Pagination Controls */}
         <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center">
           <span className="text-xs text-slate-500">
             Showing {paginatedData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}-{Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} records

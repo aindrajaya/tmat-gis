@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Delaunay } from 'd3-delaunay';
-import { Filter, Calendar, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { Filter, Calendar, ChevronDown, ChevronUp, Maximize2, Minimize2, Layers } from 'lucide-react';
 import { Device, RealtimeData } from '../types';
 import { useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
@@ -270,6 +270,8 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   const [filterOpen, setFilterOpen] = useState(false);
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [basemapOpen, setBasemapOpen] = useState(false);
+  const [selectedBasemap, setSelectedBasemap] = useState<'osm' | 'satellite' | 'dark'>('osm');
 
   // Center on Indonesia roughly
   const center: [number, number] = [-2.5489, 118.0149];
@@ -679,10 +681,26 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         zoom={5} 
         style={{ height: '100%', width: '100%' }}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        {/* Dynamic Basemap Layer */}
+        {selectedBasemap === 'osm' && (
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        )}
+        {selectedBasemap === 'satellite' && (
+          <TileLayer
+            attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+          />
+        )}
+        {selectedBasemap === 'dark' && (
+          <TileLayer
+            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          />
+        )}
         
         <MapBoundsHandler devices={filteredDevices} />
         
@@ -1350,6 +1368,62 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
 
       {/* Legend Panel */}
       <WaterLevelLegend isOpen={legendOpen} onToggle={() => setLegendOpen(!legendOpen)} />
+
+      {/* Basemap Switcher */}
+      <div className="absolute bottom-24 right-4 z-[999]">
+        <div className="bg-white rounded-lg shadow-lg border border-slate-200">
+          <button
+            onClick={() => setBasemapOpen(!basemapOpen)}
+            className="p-3 hover:bg-slate-50 transition-colors rounded-lg flex items-center gap-2"
+            title={isIndonesian ? 'Ganti Peta Dasar' : 'Change Basemap'}
+          >
+            <Layers size={20} className="text-slate-700" />
+            <span className="text-xs font-medium text-slate-700">
+              {isIndonesian ? 'Peta' : 'Map'}
+            </span>
+          </button>
+          
+          {basemapOpen && (
+            <div className="absolute bottom-full right-0 mb-2 bg-white rounded-lg shadow-xl border border-slate-200 p-2 min-w-[200px]">
+              <p className="text-xs font-semibold text-slate-600 mb-2 px-2">
+                {isIndonesian ? 'Pilih Peta Dasar' : 'Select Basemap'}
+              </p>
+              <div className="space-y-1">
+                <button
+                  onClick={() => { setSelectedBasemap('osm'); setBasemapOpen(false); }}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    selectedBasemap === 'osm' 
+                      ? 'bg-emerald-100 text-emerald-700 font-medium' 
+                      : 'hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  🗺️ OpenStreetMap
+                </button>
+                <button
+                  onClick={() => { setSelectedBasemap('satellite'); setBasemapOpen(false); }}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    selectedBasemap === 'satellite' 
+                      ? 'bg-emerald-100 text-emerald-700 font-medium' 
+                      : 'hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  🛰️ {isIndonesian ? 'Satelit' : 'Satellite'}
+                </button>
+                <button
+                  onClick={() => { setSelectedBasemap('dark'); setBasemapOpen(false); }}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                    selectedBasemap === 'dark' 
+                      ? 'bg-emerald-100 text-emerald-700 font-medium' 
+                      : 'hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  🌙 {isIndonesian ? 'Mode Gelap' : 'Dark Mode'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Info and Expand buttons in bottom right */}
       <div className="absolute bottom-4 right-4 z-[1000] flex gap-2">

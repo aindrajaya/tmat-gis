@@ -48,10 +48,13 @@ const getDateRange = (period: string): { startDate: string; endDate: string } =>
 const defaultFilters: FilterState = {
   provinsi: '',
   kabupaten: '',
+  kecamatan: '',
+  desa: '',
   jenis_perusahaan: '',
   startDate: '2025-11-01',
   endDate: '2025-11-25',
-  timePeriod: 'custom'
+  timePeriod: 'custom',
+  searchText: ''
 };
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);

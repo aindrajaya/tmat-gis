@@ -276,6 +276,33 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   // Center on Indonesia roughly
   const center: [number, number] = [-2.5489, 118.0149];
 
+  // Get unique provinces from devices data
+  const provinceOptions = useMemo(() => {
+    if (!devices) return [];
+    const provinces = new Set<string>();
+    devices.forEach(device => {
+      if (device.provinsi) {
+        provinces.add(device.provinsi);
+      }
+    });
+    return Array.from(provinces).sort();
+  }, [devices]);
+
+  // Get kabupaten/kota filtered by selected province
+  const kabupatenOptions = useMemo(() => {
+    if (!devices) return [];
+    const targetProv = enforcedProvinsi || filters.provinsi;
+    if (!targetProv) return [];
+    
+    const kabupaten = new Set<string>();
+    devices.forEach(device => {
+      if (device.provinsi === targetProv && device.kabupaten) {
+        kabupaten.add(device.kabupaten);
+      }
+    });
+    return Array.from(kabupaten).sort();
+  }, [devices, filters.provinsi, enforcedProvinsi]);
+
   // Force map re-render when realtime data loads
   useEffect(() => {
     if (realtimeData && realtimeData.length > 0) {
@@ -567,14 +594,17 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                   <select 
                     className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={enforcedProvinsi || filters.provinsi}
-                    onChange={(e) => updateFilter('provinsi', e.target.value)}
+                    onChange={(e) => {
+                      updateFilter('provinsi', e.target.value);
+                      // Reset kabupaten when province changes
+                      updateFilter('kabupaten', '');
+                    }}
                     disabled={!!enforcedProvinsi}
                   >
                     <option value="">{isIndonesian ? 'Semua Provinsi' : 'All Provinces'}</option>
-                    <option value="Jawa Timur">Jawa Timur</option>
-                    <option value="Riau">Riau</option>
-                    <option value="Kalimantan Tengah">Kalimantan Tengah</option>
-                    <option value="Jambi">Jambi</option>
+                    {provinceOptions.map(prov => (
+                      <option key={prov} value={prov}>{prov}</option>
+                    ))}
                   </select>
                   {enforcedProvinsi && (
                     <p className="text-[11px] text-emerald-600 font-medium">
@@ -594,11 +624,12 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                     className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={filters.kabupaten}
                     onChange={(e) => updateFilter('kabupaten', e.target.value)}
+                    disabled={!filters.provinsi && !enforcedProvinsi}
                   >
                     <option value="">{isIndonesian ? 'Semua Kabupaten' : 'All Regencies'}</option>
-                    <option value="Surabaya">Surabaya</option>
-                    <option value="Pekanbaru">Pekanbaru</option>
-                    <option value="Palangka">Palangka</option>
+                    {kabupatenOptions.map(kab => (
+                      <option key={kab} value={kab}>{kab}</option>
+                    ))}
                   </select>
                 </div>
 

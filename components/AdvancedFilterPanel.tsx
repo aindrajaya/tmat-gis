@@ -1,17 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFilters } from '../context/FilterContext';
+import { useDevices } from '../services/useApi';
+import { useAuth } from '../context/AuthContext';
 import { Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
 
 const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { filters, updateFilter, setTimePeriod, resetFilters, enforcedProvinsi } = useFilters();
+  const { user } = useAuth();
+  const { data: devices } = useDevices(user?.perusahaanId || undefined);
   const [activeTab, setActiveTab] = useState<'location' | 'date' | 'search'>('location');
 
   const handlePresetClick = (period: 'today' | '7d' | '14d' | '30d') => {
     setTimePeriod(period);
   };
+
+  // Get unique provinces from devices data
+  const provinceOptions = useMemo(() => {
+    if (!devices) return [];
+    const provinces = new Set<string>();
+    devices.forEach(device => {
+      if (device.provinsi) {
+        provinces.add(device.provinsi);
+      }
+    });
+    return Array.from(provinces).sort();
+  }, [devices]);
+
+  // Get kabupaten/kota filtered by selected province
+  const kabupatenOptions = useMemo(() => {
+    if (!devices) return [];
+    const targetProv = enforcedProvinsi || filters.provinsi;
+    if (!targetProv) return [];
+    
+    const kabupaten = new Set<string>();
+    devices.forEach(device => {
+      if (device.provinsi === targetProv && device.kabupaten) {
+        kabupaten.add(device.kabupaten);
+      }
+    });
+    return Array.from(kabupaten).sort();
+  }, [devices, filters.provinsi, enforcedProvinsi]);
+
+  // Get kecamatan filtered by selected kabupaten
+  const kecamatanOptions = useMemo(() => {
+    if (!devices || !filters.kabupaten) return [];
+    const kecamatan = new Set<string>();
+    devices.forEach(device => {
+      if (device.kabupaten === filters.kabupaten && device.kota) {
+        kecamatan.add(device.kota);
+      }
+    });
+    return Array.from(kecamatan).sort();
+  }, [devices, filters.kabupaten]);
+
+  // Get desa filtered by selected kecamatan
+  const desaOptions = useMemo(() => {
+    if (!devices || !filters.kecamatan) return [];
+    const desa = new Set<string>();
+    devices.forEach(device => {
+      if (device.kota === filters.kecamatan && device.alamat) {
+        // Extract village name from address (assuming it's part of the address field)
+        desa.add(device.alamat);
+      }
+    });
+    return Array.from(desa).sort();
+  }, [devices, filters.kecamatan]);
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTimePeriod('custom');
@@ -126,10 +182,9 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 >
                   <option value="">{isIndonesian ? 'Semua Provinsi' : 'All Provinces'}</option>
-                  <option value="Jawa Timur">Jawa Timur</option>
-                  <option value="Riau">Riau</option>
-                  <option value="Kalimantan Tengah">Kalimantan Tengah</option>
-                  <option value="Jambi">Jambi</option>
+                  {provinceOptions.map(prov => (
+                    <option key={prov} value={prov}>{prov}</option>
+                  ))}
                 </select>
                 {enforcedProvinsi && (
                   <p className="text-xs text-emerald-600 font-medium mt-2">
@@ -157,11 +212,15 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
                 >
                   <option value="">{isIndonesian ? 'Semua Kabupaten/Kota' : 'All Regencies/Cities'}</option>
-                  <option value="Surabaya">Surabaya</option>
-                  <option value="Pekanbaru">Pekanbaru</option>
-                  <option value="Palangka">Palangka</option>
-                  <option value="Jambi">Jambi</option>
+                  {kabupatenOptions.map(kab => (
+                    <option key={kab} value={kab}>{kab}</option>
+                  ))}
                 </select>
+                {!filters.provinsi && !enforcedProvinsi && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    {isIndonesian ? 'Pilih Provinsi terlebih dahulu' : 'Select Province first'}
+                  </p>
+                )}
               </div>
 
               {/* Kecamatan Filter */}
@@ -180,9 +239,9 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
                 >
                   <option value="">{isIndonesian ? 'Semua Kecamatan' : 'All Districts'}</option>
-                  <option value="Kecamatan 1">Kecamatan 1</option>
-                  <option value="Kecamatan 2">Kecamatan 2</option>
-                  <option value="Kecamatan 3">Kecamatan 3</option>
+                  {kecamatanOptions.map(kec => (
+                    <option key={kec} value={kec}>{kec}</option>
+                  ))}
                 </select>
                 {!filters.kabupaten && (
                   <p className="text-xs text-slate-500 mt-1">
@@ -196,14 +255,17 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {isIndonesian ? 'Desa/Kelurahan' : 'Village'}
                 </label>
-                <input
-                  type="text"
-                  placeholder={isIndonesian ? 'Ketik nama desa...' : 'Type village name...'}
+                <select
                   value={filters.desa}
                   onChange={(e) => updateFilter('desa', e.target.value)}
                   disabled={!filters.kecamatan}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed placeholder-slate-400"
-                />
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">{isIndonesian ? 'Semua Desa/Kelurahan' : 'All Villages'}</option>
+                  {desaOptions.map(des => (
+                    <option key={des} value={des}>{des}</option>
+                  ))}
+                </select>
                 {!filters.kecamatan && (
                   <p className="text-xs text-slate-500 mt-1">
                     {isIndonesian ? 'Pilih Kecamatan terlebih dahulu' : 'Select District first'}

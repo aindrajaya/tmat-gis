@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, ChevronDown, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useRealtimeAll, useDevices } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
+import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
 
 const RawData: React.FC = () => {
   const { t } = useTranslation();
@@ -20,12 +21,8 @@ const RawData: React.FC = () => {
   const [tableData, setTableData] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
-  const [selectedProvince, setSelectedProvince] = useState<string>('');
-  const [selectedCity, setSelectedCity] = useState<string>('');
-  const [filterStartDate, setFilterStartDate] = useState<string>('');
-  const [filterEndDate, setFilterEndDate] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
   const pageSize = 50;
 
   // Prepare table data: Join realtime with device info
@@ -58,71 +55,57 @@ const RawData: React.FC = () => {
       const device = devices.find(d => d.device_id_unik === rt.device_id_unik);
       return {
         ...rt,
+        device: device,
         location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
       };
     });
 
     setTableData(data);
     setCurrentPage(1); // Reset to first page when data changes
-  }, [realtimeData, devices, filters.startDate, filters.endDate]);
+  }, [realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
 
-  // Get unique provinces and cities from all data
-  const allData = useMemo(() => {
-    if (!realtimeData || !devices) return [];
-    return realtimeData.map(rt => {
-      const device = devices.find(d => d.device_id_unik === rt.device_id_unik);
-      return {
-        ...rt,
-        provinsi: device?.provinsi || 'Unknown',
-        kota: device?.kota || 'Unknown',
-        location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
-      };
-    });
-  }, [realtimeData, devices]);
-
-  const uniqueProvinces = useMemo(() => {
-    const provinces = new Set(allData.map(d => d.provinsi));
-    return Array.from(provinces).sort();
-  }, [allData]);
-
-  const uniqueCities = useMemo(() => {
-    if (!selectedProvince) return [];
-    const cities = new Set(allData.filter(d => d.provinsi === selectedProvince).map(d => d.kota));
-    return Array.from(cities).sort();
-  }, [allData, selectedProvince]);
-
-  // Apply local filters
+  // Apply local filters from context
   const filteredData = useMemo(() => {
     let result = tableData;
 
-    // Filter by province
-    if (selectedProvince) {
-      result = result.filter(row => {
-        const device = devices?.find(d => d.device_id_unik === row.device_id_unik);
-        return device?.provinsi === selectedProvince;
-      });
+    // Filter by kabupaten (city)
+    if (filters.kabupaten) {
+      result = result.filter(row => row.device?.kabupaten === filters.kabupaten);
     }
 
-    // Filter by city
-    if (selectedCity) {
-      result = result.filter(row => {
-        const device = devices?.find(d => d.device_id_unik === row.device_id_unik);
-        return device?.kota === selectedCity;
-      });
+    // Filter by kecamatan
+    if (filters.kecamatan) {
+      result = result.filter(row => row.device?.kota === filters.kecamatan);
     }
 
-    // Filter by date range
-    if (filterStartDate || filterEndDate) {
+    // Filter by desa
+    if (filters.desa) {
+      result = result.filter(row => 
+        row.device?.alamat && row.device.alamat.toLowerCase().includes(filters.desa.toLowerCase())
+      );
+    }
+
+    // Filter by company type
+    if (filters.jenis_perusahaan) {
+      result = result.filter(row => row.device?.id_perusahaan.toString() === filters.jenis_perusahaan);
+    }
+
+    // Apply search filter
+    if (filters.searchText) {
+      const searchLower = filters.searchText.toLowerCase();
       result = result.filter(row => {
-        const dataDate = row.timestamp_data.split(' ')[0];
-        const matchesStart = !filterStartDate || dataDate >= filterStartDate;
-        const matchesEnd = !filterEndDate || dataDate <= filterEndDate;
-        return matchesStart && matchesEnd;
+        const matchesId = row.device_id_unik.toLowerCase().includes(searchLower);
+        const matchesLocation = row.location.toLowerCase().includes(searchLower);
+        const matchesKota = row.device?.kota?.toLowerCase().includes(searchLower);
+        const matchesProvinsi = row.device?.provinsi?.toLowerCase().includes(searchLower);
+        const matchesAlamat = row.device?.alamat?.toLowerCase().includes(searchLower);
+        
+        return matchesId || matchesLocation || matchesKota || matchesProvinsi || matchesAlamat;
       });
     }
 
     return result;
-  }, [tableData, selectedProvince, selectedCity, filterStartDate, filterEndDate, devices]);
+  }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText]);
 
   // Paginate table data
   const paginatedData = filteredData.slice(
@@ -193,14 +176,18 @@ const RawData: React.FC = () => {
 
     // Add filter info if applied
     let filterY = 28;
-    if (selectedProvince || selectedCity || filterStartDate || filterEndDate) {
+    if (filters.provinsi || filters.kabupaten || filters.kecamatan || filters.desa || filters.jenis_perusahaan || filters.searchText || filters.startDate || filters.endDate) {
       doc.setFontSize(9);
       doc.setTextColor(107, 114, 128);
       const filterInfo = [
-        selectedProvince ? `Province: ${selectedProvince}` : null,
-        selectedCity ? `City: ${selectedCity}` : null,
-        filterStartDate ? `From: ${filterStartDate}` : null,
-        filterEndDate ? `To: ${filterEndDate}` : null
+        filters.provinsi ? `Province: ${filters.provinsi}` : null,
+        filters.kabupaten ? `Regency: ${filters.kabupaten}` : null,
+        filters.kecamatan ? `District: ${filters.kecamatan}` : null,
+        filters.desa ? `Village: ${filters.desa}` : null,
+        filters.jenis_perusahaan ? `Type: ${filters.jenis_perusahaan}` : null,
+        filters.searchText ? `Search: ${filters.searchText}` : null,
+        filters.startDate ? `From: ${filters.startDate}` : null,
+        filters.endDate ? `To: ${filters.endDate}` : null
       ].filter(Boolean).join(' | ');
       doc.text(`Filters: ${filterInfo}`, margin, filterY);
       filterY += 6;
@@ -366,96 +353,23 @@ const RawData: React.FC = () => {
         </div>
         
         {/* Filter Section */}
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <div className="px-6 py-3 border-b border-slate-100 bg-slate-50">
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition"
+            onClick={() => setFilterOpen(true)}
+            className="flex items-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 px-3 py-2 rounded-lg transition"
           >
-            <ChevronDown size={18} className={`transform transition ${showFilters ? 'rotate-180' : ''}`} />
-            Filters
-            {(selectedProvince || selectedCity || filterStartDate || filterEndDate) && (
-              <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                {[selectedProvince, selectedCity, filterStartDate, filterEndDate].filter(Boolean).length} active
+            <Filter size={18} />
+            {t('common:buttons.filter', 'Filters')}
+            {(filters.provinsi || filters.kabupaten || filters.kecamatan || filters.desa || filters.jenis_perusahaan || filters.searchText) && (
+              <span className="ml-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full font-bold">
+                {[filters.provinsi, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText].filter(Boolean).length}
               </span>
             )}
           </button>
-
-          {showFilters && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Province Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Province</label>
-                <select
-                  value={selectedProvince}
-                  onChange={(e) => {
-                    setSelectedProvince(e.target.value);
-                    setSelectedCity(''); // Reset city when province changes
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Provinces</option>
-                  {uniqueProvinces.map(province => (
-                    <option key={province} value={province}>{province}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* City Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">City</label>
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  disabled={!selectedProvince}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">All Cities</option>
-                  {uniqueCities.map(city => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Start Date Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Start Date</label>
-                <input
-                  type="date"
-                  value={filterStartDate}
-                  onChange={(e) => setFilterStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* End Date Filter */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">End Date</label>
-                <input
-                  type="date"
-                  value={filterEndDate}
-                  onChange={(e) => setFilterEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Reset Filters Button */}
-          {(selectedProvince || selectedCity || filterStartDate || filterEndDate) && (
-            <button
-              onClick={() => {
-                setSelectedProvince('');
-                setSelectedCity('');
-                setFilterStartDate('');
-                setFilterEndDate('');
-                setCurrentPage(1);
-              }}
-              className="mt-3 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition"
-            >
-              Clear Filters
-            </button>
-          )}
         </div>
+
+        {/* Advanced Filter Panel Modal */}
+        <AdvancedFilterPanel isOpen={filterOpen} onClose={() => setFilterOpen(false)} />
         
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">

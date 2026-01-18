@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, FileText, FileSpreadsheet, ChevronDown, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -9,6 +9,25 @@ import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
 import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
 
+// Memoized table row component to prevent unnecessary re-renders
+interface TableRowProps {
+  row: any;
+  t: any;
+}
+
+const TableRow = memo(({ row, t }: TableRowProps) => (
+  <tr className="hover:bg-slate-50 transition-colors">
+    <td className="px-6 py-3 font-medium">{row.timestamp_data}</td>
+    <td className="px-6 py-3 text-emerald-700">{row.device_id_unik}</td>
+    <td className="px-6 py-3">{row.location}</td>
+    <td className={`px-6 py-3 text-right font-bold ${row.tmat_value < -0.4 ? 'text-red-600' : 'text-slate-700'}`}>
+      {row.tmat_value}
+    </td>
+    <td className="px-6 py-3 text-right">{row.suhu_value}</td>
+    <td className="px-6 py-3 text-right">{row.ph_value}</td>
+  </tr>
+));
+
 const RawData: React.FC = () => {
   const { t } = useTranslation();
   const { filters, enforcedProvinsi } = useFilters();
@@ -18,101 +37,109 @@ const RawData: React.FC = () => {
   const { data: realtimeData, loading, error, refetch } = useRealtimeAll(user?.perusahaanId || undefined);
   const { data: devices } = useDevices(user?.perusahaanId || undefined);
   
-  const [tableData, setTableData] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const pageSize = 50;
 
-  // Prepare table data: Join realtime with device info
-  useEffect(() => {
-    if (!realtimeData || !devices) return;
+  // Prepare table data: Join realtime with device info (memoized for performance)
+  const tableData = useMemo(() => {
+    if (!realtimeData || !devices) return [];
 
-    let filteredData = realtimeData;
+    // Create device lookup map for O(1) lookups instead of O(n) array searches
+    const deviceById = new Map(devices.map(d => [d.device_id_unik, d]));
 
     // Province gate: drop records outside enforced or selected province
     const targetProv = enforcedProvinsi || filters.provinsi;
-    if (targetProv) {
-      const deviceById = new Map(devices.map(d => [d.device_id_unik, d]));
-      filteredData = filteredData.filter(rt => {
+    
+    return realtimeData
+      // Province filter
+      .filter(rt => {
+        if (!targetProv) return true;
         const device = deviceById.get(rt.device_id_unik);
         return device ? device.provinsi === targetProv : false;
-      });
-    }
-
-    // Apply date filters if set
-    if (filters.startDate || filters.endDate) {
-      filteredData = filteredData.filter(rt => {
+      })
+      // Date range filter
+      .filter(rt => {
+        if (!filters.startDate && !filters.endDate) return true;
         const dataDate = rt.timestamp_data.split(' ')[0]; // Extract YYYY-MM-DD
         const matchesStart = !filters.startDate || dataDate >= filters.startDate;
         const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
         return matchesStart && matchesEnd;
+      })
+      // Enrich with device data
+      .map(rt => {
+        const device = deviceById.get(rt.device_id_unik);
+        return {
+          ...rt,
+          device: device,
+          location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
+        };
       });
-    }
-
-    const data = filteredData.map(rt => {
-      const device = devices.find(d => d.device_id_unik === rt.device_id_unik);
-      return {
-        ...rt,
-        device: device,
-        location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
-      };
-    });
-
-    setTableData(data);
-    setCurrentPage(1); // Reset to first page when data changes
   }, [realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
 
-  // Apply local filters from context
+  // Reset to first page when base table data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tableData]);
+
+  // Apply local filters from context (memoized to only recompute when filters change)
   const filteredData = useMemo(() => {
-    let result = tableData;
+    // Early exit if no base data
+    if (!tableData || tableData.length === 0) return [];
 
-    // Filter by kabupaten (city)
-    if (filters.kabupaten) {
-      result = result.filter(row => row.device?.kabupaten === filters.kabupaten);
-    }
+    return tableData.filter(row => {
+      // Filter by kabupaten (city)
+      if (filters.kabupaten && row.device?.kabupaten !== filters.kabupaten) {
+        return false;
+      }
 
-    // Filter by kecamatan
-    if (filters.kecamatan) {
-      result = result.filter(row => row.device?.kota === filters.kecamatan);
-    }
+      // Filter by kecamatan
+      if (filters.kecamatan && row.device?.kota !== filters.kecamatan) {
+        return false;
+      }
 
-    // Filter by desa
-    if (filters.desa) {
-      result = result.filter(row => 
-        row.device?.alamat && row.device.alamat.toLowerCase().includes(filters.desa.toLowerCase())
-      );
-    }
+      // Filter by desa
+      if (filters.desa && !(row.device?.alamat?.toLowerCase().includes(filters.desa.toLowerCase()))) {
+        return false;
+      }
 
-    // Filter by company type
-    if (filters.jenis_perusahaan) {
-      result = result.filter(row => row.device?.id_perusahaan.toString() === filters.jenis_perusahaan);
-    }
+      // Filter by company type
+      if (filters.jenis_perusahaan && row.device?.id_perusahaan.toString() !== filters.jenis_perusahaan) {
+        return false;
+      }
 
-    // Apply search filter
-    if (filters.searchText) {
-      const searchLower = filters.searchText.toLowerCase();
-      result = result.filter(row => {
+      // Apply search filter
+      if (filters.searchText) {
+        const searchLower = filters.searchText.toLowerCase();
         const matchesId = row.device_id_unik.toLowerCase().includes(searchLower);
         const matchesLocation = row.location.toLowerCase().includes(searchLower);
         const matchesKota = row.device?.kota?.toLowerCase().includes(searchLower);
         const matchesProvinsi = row.device?.provinsi?.toLowerCase().includes(searchLower);
         const matchesAlamat = row.device?.alamat?.toLowerCase().includes(searchLower);
         
-        return matchesId || matchesLocation || matchesKota || matchesProvinsi || matchesAlamat;
-      });
-    }
+        if (!(matchesId || matchesLocation || matchesKota || matchesProvinsi || matchesAlamat)) {
+          return false;
+        }
+      }
 
-    return result;
+      return true;
+    });
   }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText]);
 
-  // Paginate table data
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+  // Paginate table data (memoized to avoid unnecessary slice operations)
+  const paginatedData = useMemo(() => {
+    return filteredData.slice(
+      (currentPage - 1) * pageSize,
+      currentPage * pageSize
+    );
+  }, [filteredData, currentPage, pageSize]);
+
+  // Calculate total pages (memoized)
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredData.length / pageSize);
+  }, [filteredData.length, pageSize]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -125,8 +152,8 @@ const RawData: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Export to CSV
-  const exportToCSV = () => {
+  // Memoized export handlers to prevent unnecessary function recreation
+  const exportToCSV = useCallback(() => {
     if (filteredData.length === 0) return;
 
     const headers = ['Timestamp', 'Device ID', 'Location', 'TMAT (m)', 'Temperature (°C)', 'pH'];
@@ -153,10 +180,10 @@ const RawData: React.FC = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
-  };
+  }, [filteredData]);
 
   // Export to PDF
-  const exportToPDF = () => {
+  const exportToPDF = useCallback(() => {
     if (filteredData.length === 0) return;
 
     const doc = new jsPDF('landscape', 'mm', 'a4');
@@ -242,10 +269,10 @@ const RawData: React.FC = () => {
 
     doc.save(`raw-data-${new Date().toISOString().split('T')[0]}.pdf`);
     setShowExportMenu(false);
-  };
+  }, [filteredData, filters]);
 
   // Export to Excel
-  const exportToExcel = () => {
+  const exportToExcel = useCallback(() => {
     if (filteredData.length === 0) return;
 
     const excelData = filteredData.map(row => ({
@@ -273,7 +300,7 @@ const RawData: React.FC = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Raw Data');
     XLSX.writeFile(workbook, `raw-data-${new Date().toISOString().split('T')[0]}.xlsx`);
     setShowExportMenu(false);
-  };
+  }, [filteredData]);
 
   // Handle loading state
   if (loading) {
@@ -386,16 +413,7 @@ const RawData: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {paginatedData.length > 0 ? (
                 paginatedData.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-3 font-medium">{row.timestamp_data}</td>
-                    <td className="px-6 py-3 text-emerald-700">{row.device_id_unik}</td>
-                    <td className="px-6 py-3">{row.location}</td>
-                    <td className={`px-6 py-3 text-right font-bold ${row.tmat_value < -0.4 ? 'text-red-600' : 'text-slate-700'}`}>
-                      {row.tmat_value}
-                    </td>
-                    <td className="px-6 py-3 text-right">{row.suhu_value}</td>
-                    <td className="px-6 py-3 text-right">{row.ph_value}</td>
-                  </tr>
+                  <TableRow key={row.id} row={row} t={t} />
                 ))
               ) : (
                 <tr>
@@ -408,6 +426,7 @@ const RawData: React.FC = () => {
           </table>
         </div>
         
+        {/* Pagination Controls */}
         <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center">
           <span className="text-xs text-slate-500">
             Showing {paginatedData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}-{Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} records

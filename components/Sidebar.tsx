@@ -41,8 +41,8 @@ const Sidebar: React.FC = () => {
     <aside className={`${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 h-screen fixed left-0 top-0 z-30 flex flex-col transition-all duration-300`}>
       <div className="p-6 border-b border-slate-100 flex items-center space-x-3">
         <img 
-          src="/klhk-logo.png" 
-          alt="KLHK Logo" 
+          src="/klh-logo.png" 
+          alt="KLH Logo" 
           className="w-10 h-10 flex-shrink-0 object-contain"
         />
         {!isCollapsed && (

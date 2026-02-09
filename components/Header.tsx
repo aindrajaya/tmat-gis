@@ -10,7 +10,7 @@ const Header: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <img 
-            src="/klh-logo.png" 
+            src="https://res.cloudinary.com/dmg3buzby/image/upload/v1770679022/klh-logo_j4r4ex.png" 
             alt="KLH Logo" 
             className="w-10 h-10 object-contain"
           />

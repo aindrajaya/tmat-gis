@@ -87,7 +87,7 @@ const Login: React.FC = () => {
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
               <img 
-                src="/klh-logo.png" 
+                src="https://res.cloudinary.com/dmg3buzby/image/upload/v1770679022/klh-logo_j4r4ex.png" 
                 alt="KLH Logo" 
                 className="w-24 h-24 object-contain"
               />

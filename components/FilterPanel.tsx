@@ -7,7 +7,7 @@ const FilterPanel: React.FC = () => {
   const { filters, setTimePeriod, updateFilter, resetFilters } = useFilters();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handlePresetClick = (period: 'today' | '7d' | '14d' | '30d') => {
+  const handlePresetClick = (period: 'today' | '7d' | '14d' | '30d' | '365d') => {
     setTimePeriod(period);
   };
 

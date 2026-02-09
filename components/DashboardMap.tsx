@@ -288,16 +288,22 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     return Array.from(provinces).sort();
   }, [devices]);
 
-  // Get kabupaten/kota filtered by selected province
+  // Get kabupaten/kota - show all when no province selected, filtered when province is selected
   const kabupatenOptions = useMemo(() => {
     if (!devices) return [];
     const targetProv = enforcedProvinsi || filters.provinsi;
-    if (!targetProv) return [];
     
     const kabupaten = new Set<string>();
     devices.forEach(device => {
-      if (device.provinsi === targetProv && device.kabupaten) {
-        kabupaten.add(device.kabupaten);
+      // If there's a target province, filter by it; otherwise show all
+      if (targetProv) {
+        if (device.provinsi === targetProv && device.kabupaten) {
+          kabupaten.add(device.kabupaten);
+        }
+      } else {
+        if (device.kabupaten) {
+          kabupaten.add(device.kabupaten);
+        }
       }
     });
     return Array.from(kabupaten).sort();
@@ -623,8 +629,18 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                   <select 
                     className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={filters.kabupaten}
-                    onChange={(e) => updateFilter('kabupaten', e.target.value)}
-                    disabled={!filters.provinsi && !enforcedProvinsi}
+                    onChange={(e) => {
+                      const selectedKabupaten = e.target.value;
+                      updateFilter('kabupaten', selectedKabupaten);
+                      
+                      // Auto-update province when kabupaten is selected (if not enforced)
+                      if (selectedKabupaten && !enforcedProvinsi && !filters.provinsi) {
+                        const matchingDevice = devices?.find(device => device.kabupaten === selectedKabupaten);
+                        if (matchingDevice?.provinsi) {
+                          updateFilter('provinsi', matchingDevice.provinsi);
+                        }
+                      }
+                    }}
                   >
                     <option value="">{isIndonesian ? 'Semua Kabupaten' : 'All Regencies'}</option>
                     {kabupatenOptions.map(kab => (

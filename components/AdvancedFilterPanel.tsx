@@ -29,16 +29,22 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
     return Array.from(provinces).sort();
   }, [devices]);
 
-  // Get kabupaten/kota filtered by selected province
+  // Get kabupaten/kota - show all when no province selected, filtered when province is selected
   const kabupatenOptions = useMemo(() => {
     if (!devices) return [];
     const targetProv = enforcedProvinsi || filters.provinsi;
-    if (!targetProv) return [];
     
     const kabupaten = new Set<string>();
     devices.forEach(device => {
-      if (device.provinsi === targetProv && device.kabupaten) {
-        kabupaten.add(device.kabupaten);
+      // If there's a target province, filter by it; otherwise show all
+      if (targetProv) {
+        if (device.provinsi === targetProv && device.kabupaten) {
+          kabupaten.add(device.kabupaten);
+        }
+      } else {
+        if (device.kabupaten) {
+          kabupaten.add(device.kabupaten);
+        }
       }
     });
     return Array.from(kabupaten).sort();
@@ -203,24 +209,29 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 <select
                   value={filters.kabupaten}
                   onChange={(e) => {
-                    updateFilter('kabupaten', e.target.value);
+                    const selectedKabupaten = e.target.value;
+                    updateFilter('kabupaten', selectedKabupaten);
+                    
+                    // Auto-update province when kabupaten is selected (if not enforced)
+                    if (selectedKabupaten && !enforcedProvinsi && !filters.provinsi) {
+                      const matchingDevice = devices?.find(device => device.kabupaten === selectedKabupaten);
+                      if (matchingDevice?.provinsi) {
+                        updateFilter('provinsi', matchingDevice.provinsi);
+                      }
+                    }
+                    
                     // Reset child filters when kabupaten changes
                     updateFilter('kecamatan', '');
                     updateFilter('desa', '');
                   }}
-                  disabled={!filters.provinsi && !enforcedProvinsi}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700"
                 >
                   <option value="">{isIndonesian ? 'Semua Kabupaten/Kota' : 'All Regencies/Cities'}</option>
                   {kabupatenOptions.map(kab => (
                     <option key={kab} value={kab}>{kab}</option>
                   ))}
                 </select>
-                {!filters.provinsi && !enforcedProvinsi && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    {isIndonesian ? 'Pilih Provinsi terlebih dahulu' : 'Select Province first'}
-                  </p>
-                )}
+
               </div>
 
               {/* Kecamatan Filter */}

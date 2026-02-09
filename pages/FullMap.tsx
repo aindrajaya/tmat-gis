@@ -162,11 +162,16 @@ const FullMap: React.FC = () => {
     }));
   }, [relevantRealtimeData]);
 
-  // Metrics values - Critical TMAT count based on filtered devices
-  const criticalCount = useMemo(
-    () => relevantRealtimeData.filter((r) => r.tmat_value < -0.4).length,
-    [relevantRealtimeData]
-  );
+  // Metrics values - Critical TMAT count based on unique devices
+  const criticalCount = useMemo(() => {
+    const criticalDevices = new Set<string>();
+    relevantRealtimeData.forEach(r => {
+      if (r.tmat_value < -0.4) {
+        criticalDevices.add(r.device_id_unik);
+      }
+    });
+    return criticalDevices.size;
+  }, [relevantRealtimeData]);
 
   const isLoading = devicesLoading || perusahaanLoading || realtimeLoading;
   const hasError = devicesError || perusahaanError || realtimeError;

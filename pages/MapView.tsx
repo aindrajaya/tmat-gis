@@ -33,11 +33,19 @@ const MapView: React.FC = () => {
     return filtered;
   }, [allDevices, allPerusahaan, filters]);
 
-  // Critical TMAT count based on filtered devices
+  // Critical TMAT count based on unique devices
   const criticalCount = useMemo(() => {
     if (!realtimeData || filteredDevices.length === 0) return 0;
     const deviceIds = filteredDevices.map(d => d.device_id_unik);
-    return realtimeData.filter(r => deviceIds.includes(r.device_id_unik) && r.tmat_value < -0.4).length;
+    const criticalDevices = new Set<string>();
+    
+    realtimeData.forEach(r => {
+      if (deviceIds.includes(r.device_id_unik) && r.tmat_value < -0.4) {
+        criticalDevices.add(r.device_id_unik);
+      }
+    });
+    
+    return criticalDevices.size;
   }, [realtimeData, filteredDevices]);
 
   const loading = devicesLoading || perusahaanLoading || realtimeLoading;

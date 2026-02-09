@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFilters } from '../context/FilterContext';
 import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
@@ -46,6 +46,22 @@ const Dashboard: React.FC = () => {
     end.setDate(end.getDate() + 6);
     return `${start.toLocaleDateString('en-CA')} - ${end.toLocaleDateString('en-CA')}`;
   };
+
+  // Get unique devices in critical state (TMAT < -0.4)
+  const criticalDevices = useMemo(() => {
+    if (!realtimeData || !filteredDevices.length) return new Set();
+    
+    const deviceIds = filteredDevices.map(d => d.device_id_unik);
+    const criticalSet = new Set<string>();
+    
+    realtimeData.forEach(record => {
+      if (deviceIds.includes(record.device_id_unik) && record.tmat_value < -0.4) {
+        criticalSet.add(record.device_id_unik);
+      }
+    });
+    
+    return criticalSet;
+  }, [realtimeData, filteredDevices]);
 
   // Filter devices and prepare chart data
   useEffect(() => {
@@ -236,10 +252,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-sm text-slate-500">{t('dashboard:metrics.criticalLowTmat')}</p>
           <p className="text-2xl font-bold text-rose-600">
-            {realtimeData?.filter(r => {
-              const deviceIds = filteredDevices.map(d => d.device_id_unik);
-              return deviceIds.includes(r.device_id_unik) && r.tmat_value < -0.4;
-            }).length || 0}
+            {criticalDevices.size}
           </p>
         </div>
       </div>

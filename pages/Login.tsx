@@ -8,15 +8,37 @@ const Login: React.FC = () => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
+
+  // Redirect if already authenticated
+  React.useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  // Show loading while checking authentication state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <svg className="animate-spin h-8 w-8 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-slate-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const provinceAccounts = [
     { province: 'Jawa Timur', email: 'jatim@demo.mail', password: 'Jatim12345' },
@@ -34,7 +56,7 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -45,7 +67,7 @@ const Login: React.FC = () => {
       navigate('/');
     } else {
       setError(isIndonesian ? 'Email atau password salah' : 'Invalid email or password');
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -178,10 +200,10 @@ const Login: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isSubmitting}
               className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-emerald-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

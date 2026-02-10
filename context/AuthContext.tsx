@@ -14,6 +14,7 @@ type User = {
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
@@ -80,6 +81,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -87,12 +89,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedAuth) {
       try {
         const authData = JSON.parse(storedAuth);
-        setIsAuthenticated(true);
-        setUser(authData.user);
-      } catch {
+        // Verify the stored data is valid and not too old (optional: add expiration check)
+        if (authData.user && authData.timestamp) {
+          setIsAuthenticated(true);
+          setUser(authData.user);
+        } else {
+          localStorage.removeItem('tmat_auth');
+        }
+      } catch (error) {
+        console.warn('Failed to parse stored auth data:', error);
         localStorage.removeItem('tmat_auth');
       }
     }
+    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -200,7 +209,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

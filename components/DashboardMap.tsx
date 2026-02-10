@@ -1279,6 +1279,10 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                 <div className="w-2 h-2 rounded-full bg-[#EE0000]"></div>
                 <span className="text-xs font-bold text-slate-700">{stats.extreme}</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.offline}</span>
+              </div>
             </div>
             <div className="pl-3 border-l border-slate-200">
               <span className="text-sm font-bold text-emerald-600">{stats.total}</span>

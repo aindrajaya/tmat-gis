@@ -422,7 +422,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
           };
       
       // Clip polygon to reasonable size (max 0.005 degrees from device center)
-      const maxRadius = 0.01;
+      const maxRadius = 0.01; //this radius in degrees (~1.11 km in real world)
       const clippedPolygon = polygon.map(([lat, lng]) => {
         const distLat = lat - device.latitude;
         const distLng = lng - device.longitude;

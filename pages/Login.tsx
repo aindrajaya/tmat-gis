@@ -228,13 +228,13 @@ const Login: React.FC = () => {
                   <p className="text-xs text-slate-600">
                     <strong>{isIndonesian ? 'Email:' : 'Email:'}</strong>{' '}
                     <code className="bg-white px-2 py-0.5 rounded text-emerald-700 font-mono text-xs">
-                      admin@menlh.mail
+                      admin@kemenlh.mail
                     </code>
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard('admin@menlh.mail', 'email')}
+                  onClick={() => copyToClipboard('admin@kemenlh.mail', 'email')}
                   className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded transition-colors"
                   title={isIndonesian ? 'Salin email' : 'Copy email'}
                 >

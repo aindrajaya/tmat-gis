@@ -67,11 +67,11 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
           <XAxis
             dataKey="date"
             fontSize={10}
-            angle={-90}
-            textAnchor="end"
-            height={80}
+            angle={chartView === 'weekly' ? 0 : -90}
+            textAnchor={chartView === 'weekly' ? 'middle' : 'end'}
+            height={chartView === 'weekly' ? 40 : 80}
             interval={0}
-            tick={{ dy: -5 }}
+            tick={chartView === 'weekly' ? undefined : { dy: -5 }}
           />
           <YAxis fontSize={12} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
           <RechartsTooltip content={<CustomTooltip />} />

@@ -629,11 +629,11 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <BarChartCondition ref={effectiveBarChartRef} data={chartData} chartView={chartView} />
-        <StatusTrendChart ref={effectiveStatusTrendRef} data={chartData} />
+        <StatusTrendChart ref={effectiveStatusTrendRef} data={chartData} chartView={chartView} />
       </div>
 
       {/* TMAT Trend Chart */}
-      <TMATTrendChart ref={effectiveTmatTrendRef} data={trendData} />
+      {/* <TMATTrendChart ref={effectiveTmatTrendRef} data={trendData} /> */}
     </section>
   );
 };

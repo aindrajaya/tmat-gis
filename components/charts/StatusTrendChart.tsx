@@ -4,9 +4,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 
 interface StatusTrendChartProps {
   data: any[];
+  chartView: 'daily' | 'weekly';
 }
 
-const StatusTrendChart = forwardRef<HTMLDivElement, StatusTrendChartProps>(({ data }, ref) => {
+const StatusTrendChart = forwardRef<HTMLDivElement, StatusTrendChartProps>(({ data, chartView }, ref) => {
   const { t } = useTranslation();
 
   const CustomTooltip = (props: any) => {
@@ -35,11 +36,11 @@ const StatusTrendChart = forwardRef<HTMLDivElement, StatusTrendChartProps>(({ da
           <XAxis
             dataKey="date"
             fontSize={10}
-            angle={-90}
-            textAnchor="end"
-            height={80}
+            angle={chartView === 'weekly' ? 0 : -90}
+            textAnchor={chartView === 'weekly' ? 'middle' : 'end'}
+            height={chartView === 'weekly' ? 40 : 80}
             interval={0}
-            tick={{ dy: -5 }}
+            tick={chartView === 'weekly' ? undefined : { dy: -5 }}
           />
           <YAxis fontSize={12} />
           <RechartsTooltip content={<CustomTooltip />} />

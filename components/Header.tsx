@@ -9,11 +9,6 @@ const Header: React.FC = () => {
     <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-sm border-b border-slate-200 shadow-sm px-6 py-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <img 
-            src="https://res.cloudinary.com/dmg3buzby/image/upload/v1770679022/klh-logo_j4r4ex.png" 
-            alt="KLH Logo" 
-            className="w-10 h-10 object-contain"
-          />
           <div>
             <h1 className="text-lg font-semibold text-slate-800">{t('dashboard:title')}</h1>
             <p className="text-xs text-slate-500">{t('dashboard:subtitle')}</p>

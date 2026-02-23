@@ -38,7 +38,7 @@ jobs:
             
             # Rebuild and restart
             docker compose down
-            docker compose up -d --build
+            docker compose up -d --build --no-cache
             
             # Health check
             sleep 15

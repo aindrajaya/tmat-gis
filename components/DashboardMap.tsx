@@ -285,7 +285,7 @@ const VectorTileLayer: React.FC<{
       fillOpacity: 0
     };
 
-    const vectorTileLayer = new SafeVectorGrid('https://gis-desa-aindrajaya.surge.sh/tiles/{z}/{x}/{y}.pbf', {
+    const vectorTileLayer = new SafeVectorGrid('https://e0ff550c.gis-desa.pages.dev/{z}/{x}/{y}.pbf', {
       vectorTileLayerStyles: {
         indonesia_districts: (properties: Record<string, unknown>, zoom: number) => {
           const province = normalize(properties?.province);

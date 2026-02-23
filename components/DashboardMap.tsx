@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo, forwardRef } from 'react';
+import React, { useState, useEffect, useMemo, forwardRef, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet.vectorgrid';
+import Pbf from 'pbf';
+import { VectorTile } from 'vector-tile';
 import { Delaunay } from 'd3-delaunay';
 import { Filter, Calendar, ChevronDown, ChevronUp, Maximize2, Minimize2, Layers } from 'lucide-react';
 import { Device, RealtimeData } from '../types';
@@ -159,9 +162,216 @@ const MapBoundsHandler: React.FC<{ devices: Device[] }> = ({ devices }) => {
       const bounds = L.latLngBounds(
         devices.map(d => [d.latitude, d.longitude] as [number, number])
       );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
     }
   }, [devices, map]);
+
+  return null;
+};
+
+const VectorTileLayer: React.FC<{
+  filters?: { provinsi?: string; kabupaten?: string; kecamatan?: string };
+}> = ({ filters }) => {
+  const safeFilters = {
+    provinsi: filters?.provinsi || '',
+    kabupaten: filters?.kabupaten || '',
+    kecamatan: filters?.kecamatan || ''
+  };
+  const map = useMap();
+  const hoverIdRef = useRef<string | number | null>(null);
+
+  useEffect(() => {
+    const getBaseStyle = (zoom: number) => {
+      const weight = zoom <= 10 ? 0.1 : zoom <= 14 ? 0.8 : 1;
+      return {
+        weight,
+        color: '#121a64',
+        fill: true,
+        fillColor: '#3498db',
+        fillOpacity: 0.2
+      };
+    };
+
+    const getHoverStyle = (zoom: number) => {
+      const weight = zoom <= 10 ? 0.8 : zoom <= 14 ? 1.2 : 1.6;
+      return {
+        weight,
+        color: '#121a64',
+        fill: true,
+        fillColor: '#5dade2',
+        fillOpacity: 0.2
+      };
+    };
+
+    const buildIdFromProps = (props: Record<string, unknown> | undefined) => {
+      const province = typeof props?.province === 'string' ? props.province : '';
+      const district = typeof props?.district === 'string' ? props.district : '';
+      const subDistrict = typeof props?.sub_district === 'string' ? props.sub_district : '';
+      const village = typeof props?.village === 'string' ? props.village : '';
+      const composite = [province, district, subDistrict, village].filter(Boolean).join('|');
+      return composite || null;
+    };
+
+    const SafeVectorGrid = (L as any).VectorGrid.Protobuf.extend({
+      _getVectorTilePromise: function (coords: { x: number; y: number; z: number }) {
+        const maxNativeZoom = typeof this.options.maxNativeZoom === 'number' ? this.options.maxNativeZoom : coords.z;
+        let x = coords.x;
+        let y = coords.y;
+        let z = coords.z;
+        if (z > maxNativeZoom) {
+          const factor = 1 << (z - maxNativeZoom);
+          x = Math.floor(x / factor);
+          y = Math.floor(y / factor);
+          z = maxNativeZoom;
+        }
+
+        const data: Record<string, number | string> = {
+          s: this._getSubdomain(coords),
+          x,
+          y,
+          z
+        };
+        if (this._map && !this._map.options.crs.infinite) {
+          const invertedY = this._globalTileRange.max.y - coords.y;
+          if (this.options.tms) {
+            data.y = invertedY;
+          }
+          data['-y'] = invertedY;
+        }
+
+        const tileUrl = L.Util.template(this._url, L.extend(data, this.options));
+        return fetch(tileUrl, this.options.fetchOptions)
+          .then((response: Response) => {
+            if (!response.ok) return { layers: [] };
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('text/html')) return { layers: [] };
+            return response.blob().then((blob: Blob) => {
+              const reader = new FileReader();
+              return new Promise((resolve) => {
+                reader.addEventListener('loadend', () => {
+                  try {
+                    const pbf = new Pbf(reader.result as ArrayBuffer);
+                    resolve(new VectorTile(pbf as any));
+                  } catch {
+                    resolve({ layers: [] });
+                  }
+                });
+                reader.readAsArrayBuffer(blob);
+              });
+            });
+          })
+          .then((json: { layers: Record<string, any> }) => {
+            for (const layerName in json.layers) {
+              const feats = [];
+              for (let i = 0; i < json.layers[layerName].length; i++) {
+                const feat = json.layers[layerName].feature(i);
+                feat.geometry = feat.loadGeometry();
+                feats.push(feat);
+              }
+              json.layers[layerName].features = feats;
+            }
+            return json;
+          });
+      }
+    });
+
+    const normalize = (value: unknown) =>
+      typeof value === 'string' ? value.trim().toUpperCase() : '';
+
+    const hiddenStyle = {
+      weight: 0,
+      opacity: 0,
+      fill: false,
+      fillOpacity: 0
+    };
+
+    const vectorTileLayer = new SafeVectorGrid('https://gis-desa-aindrajaya.surge.sh/tiles/{z}/{x}/{y}.pbf', {
+      vectorTileLayerStyles: {
+        indonesia_districts: (properties: Record<string, unknown>, zoom: number) => {
+          const province = normalize(properties?.province);
+          const district = normalize(properties?.district);
+          const subDistrict = normalize(properties?.sub_district);
+          const filterProv = normalize(safeFilters.provinsi);
+          const filterKab = normalize(safeFilters.kabupaten);
+          const filterKec = normalize(safeFilters.kecamatan);
+
+          if (filterProv && province !== filterProv) return hiddenStyle;
+          if (filterKab && district !== filterKab) return hiddenStyle;
+          if (filterKec && subDistrict !== filterKec) return hiddenStyle;
+
+          return getBaseStyle(zoom);
+        }
+      },
+      interactive: true,
+      minZoom: 0,
+      maxZoom: 18,
+      maxNativeZoom: 10,
+      bounds: L.latLngBounds(
+        L.latLng(-10.9431, 95.0108),
+        L.latLng(5.9072, 141.0194)
+      ),
+      noWrap: true,
+      rendererFactory: L.canvas.tile,
+      getFeatureId: (feature: { properties?: Record<string, unknown>; id?: string | number }) => {
+        const props = feature?.properties;
+        const explicitId = props && (props as Record<string, unknown>).id;
+        if (typeof explicitId === 'string' || typeof explicitId === 'number') return explicitId;
+        const compositeId = buildIdFromProps(props);
+        if (compositeId) return compositeId;
+        if (feature?.id !== undefined) return feature.id;
+        return L.Util.stamp(feature as object);
+      }
+    });
+
+    const getEventFeatureId = (event: { layer?: { properties?: Record<string, unknown> } }) => {
+      const props = event?.layer?.properties;
+      const explicitId = props && (props as Record<string, unknown>).id;
+      if (typeof explicitId === 'string' || typeof explicitId === 'number') return explicitId;
+      return buildIdFromProps(props);
+    };
+
+    vectorTileLayer.on('mouseover', (event: { layer?: { properties?: Record<string, unknown> } }) => {
+      const props = event?.layer?.properties ?? {};
+      const province = normalize(props.province);
+      const district = normalize(props.district);
+      const subDistrict = normalize(props.sub_district);
+      const filterProv = normalize(safeFilters.provinsi);
+      const filterKab = normalize(safeFilters.kabupaten);
+      const filterKec = normalize(safeFilters.kecamatan);
+      if (filterProv && province !== filterProv) return;
+      if (filterKab && district !== filterKab) return;
+      if (filterKec && subDistrict !== filterKec) return;
+      const featureId = getEventFeatureId(event);
+      if (featureId === null || featureId === undefined) return;
+      if (hoverIdRef.current !== null && hoverIdRef.current !== featureId) {
+        vectorTileLayer.resetFeatureStyle(hoverIdRef.current);
+      }
+      hoverIdRef.current = featureId;
+      vectorTileLayer.setFeatureStyle(featureId, getHoverStyle(map.getZoom()));
+    });
+
+    vectorTileLayer.on('mouseout', (event: { layer?: { properties?: Record<string, unknown> } }) => {
+      const featureId = getEventFeatureId(event);
+      if (featureId === null || featureId === undefined) return;
+      vectorTileLayer.resetFeatureStyle(featureId);
+      if (hoverIdRef.current === featureId) hoverIdRef.current = null;
+    });
+
+    vectorTileLayer.on('click', (event: { layer?: { properties?: Record<string, unknown> } }) => {
+      const props = event?.layer?.properties ?? {};
+      const province = typeof props.province === 'string' ? props.province : undefined;
+      const district = typeof props.district === 'string' ? props.district : undefined;
+      const subDistrict = typeof props.sub_district === 'string' ? props.sub_district : undefined;
+      const village = typeof props.village === 'string' ? props.village : undefined;
+      console.log({ province, district, sub_district: subDistrict, village });
+    });
+
+    vectorTileLayer.addTo(map);
+
+    return () => {
+      vectorTileLayer.remove();
+    };
+  }, [map, safeFilters.provinsi, safeFilters.kabupaten, safeFilters.kecamatan]);
 
   return null;
 };
@@ -272,6 +482,12 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   const [isExpanded, setIsExpanded] = useState(false);
   const [basemapOpen, setBasemapOpen] = useState(false);
   const [selectedBasemap, setSelectedBasemap] = useState<'osm' | 'satellite' | 'dark'>('osm');
+  const [showDistrictLayer, setShowDistrictLayer] = useState(true);
+
+  const indonesiaBounds = L.latLngBounds(
+    L.latLng(-10.9431, 95.0108),
+    L.latLng(5.9072, 141.0194)
+  );
 
   // Center on Indonesia roughly
   const center: [number, number] = [-2.5489, 118.0149];
@@ -726,6 +942,11 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         key={mapKey}
         center={center} 
         zoom={5} 
+        minZoom={0}
+        maxZoom={18}
+        maxBounds={indonesiaBounds}
+        maxBoundsViscosity={1.0}
+        preferCanvas={true}
         style={{ height: '100%', width: '100%' }}
       >
         {/* Dynamic Basemap Layer */}
@@ -739,7 +960,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
           <TileLayer
             attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            maxZoom={19}
+            maxZoom={18}
           />
         )}
         {selectedBasemap === 'dark' && (
@@ -750,6 +971,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         )}
         
         <MapBoundsHandler devices={filteredDevices} />
+        {showDistrictLayer && <VectorTileLayer filters={{ provinsi: filters.provinsi, kabupaten: filters.kabupaten, kecamatan: filters.kecamatan }} />}
         
         {/* Render Voronoi Polygons - Water Level Zones */}
         {!realtimeLoading && voronoiPolygons.map((data, index) => {
@@ -1212,11 +1434,39 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
               </button>
             </div>
 
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                <span className="text-sm font-medium text-slate-700">
+                  {isIndonesian ? 'Layer Distrik/Desa' : 'District/Village Layer'}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowDistrictLayer(!showDistrictLayer)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  showDistrictLayer ? 'bg-emerald-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showDistrictLayer ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
             <div className="pt-2 border-t border-slate-200">
               <p className="text-xs text-slate-500 italic">
                 {isIndonesian 
                   ? 'Aktifkan marker untuk melihat ikon perangkat di peta'
                   : 'Enable markers to see device icons on the map'}
+              </p>
+              <p className="text-xs text-slate-500 italic mt-1">
+                {isIndonesian
+                  ? 'Aktifkan layer untuk menampilkan batas distrik/desa'
+                  : 'Enable layer to display district/village boundaries'}
               </p>
             </div>
           </div>

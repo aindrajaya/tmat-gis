@@ -470,19 +470,20 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   const { user } = useAuth();
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(user?.perusahaanId || undefined);
   const { filters, updateFilter, enforcedProvinsi } = useFilters();
-  
   const [legendOpen, setLegendOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [showMarkers, setShowMarkers] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);  
   const [mapKey, setMapKey] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [basemapOpen, setBasemapOpen] = useState(false);
   const [selectedBasemap, setSelectedBasemap] = useState<'osm' | 'satellite' | 'dark'>('osm');
-  const [showDistrictLayer, setShowDistrictLayer] = useState(true);
+  
+  // Toggle settings
+  const [showDistrictLayer, setShowDistrictLayer] = useState(false);
+  const [showMarkers, setShowMarkers] = useState(false);
 
   const indonesiaBounds = L.latLngBounds(
     L.latLng(-10.9431, 95.0108),
@@ -927,6 +928,30 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       {/* Advanced Filter Panel Modal */}
       <AdvancedFilterPanel isOpen={advancedFilterOpen} onClose={() => setAdvancedFilterOpen(false)} />
 
+      {/* Selected City Banner */}
+      {filters.selectedCity && (
+        <div className="absolute top-3 right-4 z-[1000] bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg shadow-lg border border-emerald-400 p-3 text-white max-w-xs">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1">
+              <p className="text-xs font-semibold opacity-90">
+                {isIndonesian ? 'Lokasi Terpilih' : 'Selected Location'}
+              </p>
+              <p className="text-sm font-bold truncate">
+                {filters.selectedCity}
+              </p>
+            </div>
+            <button
+              onClick={() => updateFilter('selectedCity', null)}
+              className="flex-shrink-0 bg-white/20 hover:bg-white/30 rounded-full p-1.5 transition-colors"
+              title={isIndonesian ? 'Bersihkan pilihan' : 'Clear selection'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       {realtimeLoading && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[1001] bg-white/90 px-4 py-2 rounded-lg shadow-lg">
           <div className="flex items-center gap-2">
@@ -1142,6 +1167,8 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                     animate: true,
                     duration: 1
                   });
+                  // Update selected city in context
+                  updateFilter('selectedCity', cityData.city);
                 }
               }}
             >
@@ -1417,7 +1444,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 <span className="text-sm font-medium text-slate-700">
-                  {isIndonesian ? 'Tampilkan Marker' : 'Show Markers'}
+                  {isIndonesian ? 'Tampilkan Marker Device' : 'Show Device Markers'}
                 </span>
               </div>
               <button

@@ -72,7 +72,15 @@ const FullMap: React.FC = () => {
   // Realtime data scoped to filtered devices and date range
   const relevantRealtimeData = useMemo(() => {
     if (!realtimeData || filteredDevices.length === 0) return [];
-    const deviceIds = new Set(filteredDevices.map((d) => d.device_id_unik));
+    
+    let scopedDevices = filteredDevices;
+    
+    // If a city is selected, further filter devices to only those in that city
+    if (filters.selectedCity) {
+      scopedDevices = scopedDevices.filter(d => d.kota === filters.selectedCity);
+    }
+    
+    const deviceIds = new Set(scopedDevices.map((d) => d.device_id_unik));
 
     return realtimeData.filter((r) => {
       if (!deviceIds.has(r.device_id_unik)) return false;
@@ -81,7 +89,7 @@ const FullMap: React.FC = () => {
       const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
       return matchesStart && matchesEnd;
     });
-  }, [realtimeData, filteredDevices, filters.startDate, filters.endDate]);
+  }, [realtimeData, filteredDevices, filters.startDate, filters.endDate, filters.selectedCity]);
 
   // Daily chart data
   const dailyChartData = useMemo(() => {
@@ -251,6 +259,18 @@ const FullMap: React.FC = () => {
           </div>
         </div>
 
+        {/* Selected City Banner */}
+        {filters.selectedCity && (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-xl px-4 py-3">
+            <p className="text-xs text-slate-600 font-semibold mb-1">
+              {t('dashboard:analytics.viewingLocation') || 'Viewing Location'}
+            </p>
+            <p className="text-lg font-bold text-emerald-700">
+              {filters.selectedCity}
+            </p>
+          </div>
+        )}
+
         <section className="space-y-3">
           <DashboardMap devices={filteredDevices} heightClass="h-[70vh]" />
         </section>
@@ -262,6 +282,7 @@ const FullMap: React.FC = () => {
           dailyData={dailyChartData}
           weeklyData={weeklyChartData}
           trendData={trendData}
+          selectedCity={filters.selectedCity || undefined}
         />
       </div>
     </div>

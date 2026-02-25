@@ -15,6 +15,7 @@ interface ChartContainerProps {
   dailyData: any[];
   weeklyData: any[];
   trendData: any[];
+  selectedCity?: string | null;
   mapRef?: RefObject<HTMLDivElement | null>;
   barChartRef?: RefObject<HTMLDivElement | null>;
   statusTrendRef?: RefObject<HTMLDivElement | null>;
@@ -27,6 +28,7 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   dailyData,
   weeklyData,
   trendData,
+  selectedCity,
   mapRef,
   barChartRef,
   statusTrendRef,
@@ -511,7 +513,12 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
     <section className="space-y-4">
       {/* View Toggle */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h2 className="text-lg font-bold text-slate-800">{t('dashboard:charts.analyticsTitle')}</h2>
+        <h2 className="text-lg font-bold text-slate-800">
+          {selectedCity 
+            ? `${t('dashboard:charts.analyticsTitle')} Daerah ${selectedCity}`
+            : `${t('dashboard:charts.analyticsTitle')} Nasional`
+          }
+        </h2>
         <div className="flex gap-2 items-center">
           <button
             onClick={() => setChartView('daily')}

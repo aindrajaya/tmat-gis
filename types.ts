@@ -62,4 +62,5 @@ export interface FilterState {
   endDate: string;
   timePeriod?: 'today' | '7d' | '14d' | '30d' | 'custom';
   searchText?: string;
+  selectedCity?: string | null;
 }

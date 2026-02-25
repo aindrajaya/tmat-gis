@@ -5,12 +5,13 @@ import { useAuth } from './AuthContext';
 
 interface FilterContextType {
   filters: FilterState;
-  updateFilter: (key: keyof FilterState, value: string) => void;
+  updateFilter: (key: keyof FilterState, value: string | null) => void;
   setTimePeriod: (period: 'today' | '7d' | '14d' | '30d' | 'custom') => void;
   resetFilters: () => void;
   apiMode: 'dev' | 'prod';
   setApiMode: (mode: 'dev' | 'prod') => void;
   enforcedProvinsi: string | null;
+  updateSelectedCity: (cityName: string | null) => void;
 }
 
 const getDateRange = (period: string): { startDate: string; endDate: string } => {
@@ -54,7 +55,8 @@ const defaultFilters: FilterState = {
   startDate: '2025-11-01',
   endDate: '2025-11-25',
   timePeriod: 'custom',
-  searchText: ''
+  searchText: '',
+  selectedCity: null
 };
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
@@ -67,7 +69,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { user } = useAuth();
   const [enforcedProvinsi, setEnforcedProvinsi] = useState<string | null>(null);
 
-  const updateFilter = (key: keyof FilterState, value: string) => {
+  const updateFilter = (key: keyof FilterState, value: string | null) => {
     if (key === 'provinsi' && enforcedProvinsi) {
       return; // prevent overriding enforced province
     }
@@ -81,6 +83,10 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       timePeriod: period,
       ...(period !== 'custom' && { startDate, endDate })
     }));
+  };
+
+  const updateSelectedCity = (cityName: string | null) => {
+    setFilters(prev => ({ ...prev, selectedCity: cityName }));
   };
 
   const resetFilters = () => setFilters({
@@ -103,7 +109,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [user?.provinsi]);
 
   return (
-    <FilterContext.Provider value={{ filters, updateFilter, setTimePeriod, resetFilters, apiMode, setApiMode, enforcedProvinsi }}>
+    <FilterContext.Provider value={{ filters, updateFilter, setTimePeriod, resetFilters, apiMode, setApiMode, enforcedProvinsi, updateSelectedCity }}>
       {children}
     </FilterContext.Provider>
   );

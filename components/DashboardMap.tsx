@@ -12,6 +12,7 @@ import { useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
 import AdvancedFilterPanel from './AdvancedFilterPanel';
+import DeviceAnalyticsPanel from './DeviceAnalyticsPanel';
 
 // Voronoi tessellation using d3-delaunay (efficient implementation)
 const createVoronoiPolygons = (devices: Device[], bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
@@ -94,6 +95,200 @@ const createWaterDropletIcon = (color: string = '#3b82f6', count?: number) => {
   });
 };
 
+// City Marker Component with Map Access
+const CityMarkerComponent: React.FC<{
+  cityKey: string;
+  cityData: any;
+  markerColor: string;
+  isIndonesian: boolean;
+  onCityClick: (cityName: string) => void;
+}> = ({ cityKey, cityData, markerColor, isIndonesian, onCityClick }) => {
+  const map = useMap();
+  const total = cityData.devices.length;
+  const { stats } = cityData;
+
+  return (
+    <Marker
+      key={`city-${cityKey}`}
+      position={[cityData.centerLat, cityData.centerLng]}
+      icon={L.divIcon({
+        html: `
+          <div style="
+            background-color: rgba(255, 255, 255, 0.45);
+            border: 1px solid ${markerColor};
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-weight: bold;
+            font-size: 14px;
+            color: ${markerColor};
+            cursor: pointer;
+            transition: all 0.2s ease;
+          "
+          onmouseover="this.style.transform='scale(1.1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.95)';"
+          onmouseout="this.style.transform='scale(1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.85)';"
+          >
+            ${total}
+          </div>
+        `,
+        className: 'city-marker',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+        popupAnchor: [0, -20],
+      })}
+      eventHandlers={{
+        click: (e) => {
+          // Zoom to city location using map reference
+          console.log('[CityMarkerComponent] ===== CLICK TRIGGERED =====');
+          console.log('[CityMarkerComponent] Clicked city:', cityData.city);
+          console.log('[CityMarkerComponent] Coords:', [cityData.centerLat, cityData.centerLng]);
+          console.log('[CityMarkerComponent] Current zoom:', map.getZoom());
+          
+          // Stop event propagation to prevent polygon clicks
+          e.originalEvent?.stopPropagation();
+          
+          // Update selected city in context first
+          onCityClick(cityData.city);
+          
+          // Use setTimeout to ensure zoom happens after React batching
+          setTimeout(() => {
+            console.log('[CityMarkerComponent] Executing delayed setView');
+            
+            // Offset the latitude slightly to account for UI elements at the top
+            // At zoom level 11, ~0.015 degrees shift down (compensates for top panels)
+            const offsetLat = cityData.centerLat + 0.015;
+            
+            map.setView([offsetLat, cityData.centerLng], 11, {
+              animate: true
+            });
+            console.log('[CityMarkerComponent] Zoom after setView:', map.getZoom());
+          }, 100);
+        }
+      }}
+    >
+      <Popup maxWidth={320} minWidth={280}>
+        <div className="p-3">
+          <h3 className="font-bold text-slate-800 text-base mb-1">
+            {cityData.city}
+          </h3>
+          <p className="text-xs text-slate-500 mb-3">{cityData.provinsi}</p>
+          
+          <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-emerald-800">
+                {isIndonesian ? 'Total Perangkat' : 'Total Devices'}
+              </span>
+              <span className="text-xl font-bold text-emerald-600">{total}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2 mb-3">
+            <h4 className="text-xs font-bold text-slate-700 mb-2">
+              {isIndonesian ? 'Statistik Status:' : 'Status Statistics:'}
+            </h4>
+            
+            {stats.safe > 0 && (
+              <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
+              </div>
+            )}
+
+            {stats.low > 0 && (
+              <div className="flex items-center justify-between p-2 bg-green-50 rounded">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Rendah' : 'Low'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-green-700">{stats.low}</span>
+              </div>
+            )}
+
+            {stats.medium > 0 && (
+              <div className="flex items-center justify-between p-2 bg-cyan-50 rounded">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Sedang' : 'Medium'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
+              </div>
+            )}
+
+            {stats.high > 0 && (
+              <div className="flex items-center justify-between p-2 bg-yellow-50 rounded">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#FFFF00]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Tinggi' : 'High'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-yellow-700">{stats.high}</span>
+              </div>
+            )}
+
+            {stats.veryhigh > 0 && (
+              <div className="flex items-center justify-between p-2 bg-amber-50 rounded">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#FFC000]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-amber-700">{stats.veryhigh}</span>
+              </div>
+            )}
+
+            {stats.extreme > 0 && (
+              <div className="flex items-center justify-between p-2 bg-red-50 rounded">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Ekstrim' : 'Extreme'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
+              </div>
+            )}
+
+            {stats.offline > 0 && (
+              <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-slate-400"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Offline' : 'Offline'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-slate-700">{stats.offline}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-slate-200">
+            <p className="text-xs text-slate-500 italic">
+              {isIndonesian 
+                ? 'Klik pada zona warna untuk detail perangkat'
+                : 'Click on colored zones for device details'}
+            </p>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+};
+
 // Water level status classification based on TMAT values
 // TMAT value indicates water level depth (negative = below surface)
 const getWaterLevelStatus = (tmatValue: number) => {
@@ -156,13 +351,16 @@ interface Props {
 // Component to handle automatic map bounds fitting
 const MapBoundsHandler: React.FC<{ devices: Device[] }> = ({ devices }) => {
   const map = useMap();
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (devices && devices.length > 0) {
+    // Only auto-fit bounds on initial load, not on subsequent changes
+    if (devices && devices.length > 0 && !initializedRef.current) {
       const bounds = L.latLngBounds(
         devices.map(d => [d.latitude, d.longitude] as [number, number])
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+      initializedRef.current = true;
     }
   }, [devices, map]);
 
@@ -471,7 +669,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(user?.perusahaanId || undefined);
   const { filters, updateFilter, enforcedProvinsi } = useFilters();
   const [legendOpen, setLegendOpen] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);  
   const [mapKey, setMapKey] = useState(0);
@@ -583,6 +781,12 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     return map;
   }, [realtimeData]);
 
+  // Get realtime data for selected device
+  const selectedDeviceData = useMemo(() => {
+    if (!selectedDevice) return null;
+    return deviceDataMap.get(selectedDevice.device_id_unik) || null;
+  }, [selectedDevice, deviceDataMap]);
+
   // Create Voronoi polygons for each device
   const voronoiPolygons = useMemo(() => {
     if (filteredDevices.length === 0) return [];
@@ -679,7 +883,22 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   }, [filteredDevices]);
 
   // Group devices by city with center coordinates and statistics
-  const cityGroups = useMemo(() => {
+  const cityGroups: Map<string, {
+      city: string;
+      provinsi: string;
+      devices: Device[];
+      centerLat: number;
+      centerLng: number;
+      stats: {
+        safe: number;
+        low: number;
+        medium: number;
+        high: number;
+        veryhigh: number;
+        extreme: number;
+        offline: number;
+      };
+    }> = useMemo(() => {
     const cities = new Map<string, {
       city: string;
       provinsi: string;
@@ -1017,7 +1236,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                 opacity: 0.7
               }}
               eventHandlers={{
-                click: () => setSelectedDevice(device.device_id_unik)
+                click: () => setSelectedDevice(device)
               }}
             >
               <Popup maxWidth={280} minWidth={240}>
@@ -1102,7 +1321,6 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
 
         {/* Render city-level markers - Always visible */}
         {!realtimeLoading && Array.from(cityGroups.entries()).map(([cityKey, cityData]) => {
-          const total = cityData.devices.length;
           const { stats } = cityData;
           
           // Determine color based on most dominant status (prioritize severity)
@@ -1127,167 +1345,14 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
           }
 
           return (
-            <Marker
-              key={`city-${cityKey}`}
-              position={[cityData.centerLat, cityData.centerLng]}
-              icon={L.divIcon({
-                html: `
-                  <div style="
-                    background-color: rgba(255, 255, 255, 0.45);
-                    border: 1px solid ${markerColor};
-                    border-radius: 50%;
-                    width: 20px;
-                    height: 20px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-                    font-weight: bold;
-                    font-size: 14px;
-                    color: ${markerColor};
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                  "
-                  onmouseover="this.style.transform='scale(1.1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.95)';"
-                  onmouseout="this.style.transform='scale(1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.85)';"
-                  >
-                    ${total}
-                  </div>
-                `,
-                className: 'city-marker',
-                iconSize: [40, 40],
-                iconAnchor: [20, 20],
-                popupAnchor: [0, -20],
-              })}
-              eventHandlers={{
-                click: (e) => {
-                  const map = e.target._map;
-                  // Zoom to city location
-                  map.setView([cityData.centerLat, cityData.centerLng], 12, {
-                    animate: true,
-                    duration: 1
-                  });
-                  // Update selected city in context
-                  updateFilter('selectedCity', cityData.city);
-                }
-              }}
-            >
-              <Popup maxWidth={320} minWidth={280}>
-                <div className="p-3">
-                  <h3 className="font-bold text-slate-800 text-base mb-1">
-                    {cityData.city}
-                  </h3>
-                  <p className="text-xs text-slate-500 mb-3">{cityData.provinsi}</p>
-                  
-                  <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-emerald-800">
-                        {isIndonesian ? 'Total Perangkat' : 'Total Devices'}
-                      </span>
-                      <span className="text-xl font-bold text-emerald-600">{total}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-3">
-                    <h4 className="text-xs font-bold text-slate-700 mb-2">
-                      {isIndonesian ? 'Statistik Status:' : 'Status Statistics:'}
-                    </h4>
-                    
-                    {stats.safe > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
-                      </div>
-                    )}
-
-                    {stats.low > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Rendah' : 'Low'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-green-700">{stats.low}</span>
-                      </div>
-                    )}
-
-                    {stats.medium > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-cyan-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Sedang' : 'Medium'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
-                      </div>
-                    )}
-
-                    {stats.high > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-yellow-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#FFFF00]"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Tinggi' : 'High'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-yellow-700">{stats.high}</span>
-                      </div>
-                    )}
-
-                    {stats.veryhigh > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-amber-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#FFC000]"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-amber-700">{stats.veryhigh}</span>
-                      </div>
-                    )}
-
-                    {stats.extreme > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-red-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Ekstrim' : 'Extreme'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
-                      </div>
-                    )}
-
-                    {stats.offline > 0 && (
-                      <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-slate-400"></div>
-                          <span className="text-xs font-medium text-slate-700">
-                            {isIndonesian ? 'Offline' : 'Offline'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-slate-700">{stats.offline}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-200">
-                    <p className="text-xs text-slate-500 italic">
-                      {isIndonesian 
-                        ? 'Klik pada zona warna untuk detail perangkat'
-                        : 'Click on colored zones for device details'}
-                    </p>
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
+            <CityMarkerComponent
+              key={`city-marker-${cityKey}`}
+              cityKey={cityKey}
+              cityData={cityData}
+              markerColor={markerColor}
+              isIndonesian={isIndonesian}
+              onCityClick={(cityName) => updateFilter('selectedCity', cityName)}
+            />
           );
         })}
 
@@ -1335,7 +1400,11 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                         const rtData = deviceDataMap.get(device.device_id_unik);
                         const status = rtData ? getWaterLevelStatus(rtData.tmat_value) : null;
                         return (
-                          <div key={device.id} className="flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-slate-100 transition-colors">
+                          <button
+                            key={device.id}
+                            onClick={() => setSelectedDevice(device)}
+                            className="w-full flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-emerald-100 transition-colors text-left peer group/item"
+                          >
                             <span className="text-xs font-medium text-slate-700">{device.device_id_unik}</span>
                             {status && (
                               <div 
@@ -1348,7 +1417,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                                 {status.level}
                               </div>
                             )}
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -1397,6 +1466,13 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                               {new Date(deviceDataMap.get(firstDevice.device_id_unik)?.timestamp || '').toLocaleTimeString()}
                             </span>
                           </div>
+                          
+                          <button
+                            onClick={() => setSelectedDevice(firstDevice)}
+                            className="w-full mt-3 px-3 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-semibold rounded-lg hover:shadow-lg transition-shadow"
+                          >
+                            {isIndonesian ? 'Lihat Detail' : 'View Details'}
+                          </button>
                         </>
                       ) : (
                         <div className="p-2 bg-slate-50 rounded text-center">
@@ -1786,6 +1862,13 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
           )}
         </button>
       </div>
+
+      {/* Device Analytics Panel - Bottom Drawer */}
+      <DeviceAnalyticsPanel
+        selectedDevice={selectedDevice}
+        realtimeData={selectedDeviceData}
+        onClose={() => setSelectedDevice(null)}
+      />
     </div>
   );
 });

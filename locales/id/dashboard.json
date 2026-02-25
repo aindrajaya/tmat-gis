@@ -52,5 +52,8 @@
     "downloadDailyPDFGraphics": "Harian dengan Grafik (PDF)",
     "downloadWeeklyPDFGraphics": "Mingguan dengan Grafik (PDF)",
     "exporting": "Mengekspor..."
+  },
+  "analytics": {
+    "viewingLocation": "Menampilkan Lokasi"
   }
 }

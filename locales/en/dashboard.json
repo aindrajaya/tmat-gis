@@ -52,5 +52,8 @@
     "downloadDailyPDFGraphics": "Daily with Graphics (PDF)",
     "downloadWeeklyPDFGraphics": "Weekly with Graphics (PDF)",
     "exporting": "Exporting..."
+  },
+  "analytics": {
+    "viewingLocation": "Viewing Location"
   }
 }

@@ -89,6 +89,13 @@ const Dashboard: React.FC = () => {
       const deviceIds = filtered.map(d => d.device_id_unik);
       let relevantData = realtimeData.filter(r => deviceIds.includes(r.device_id_unik));
 
+      // If a city is selected, filter devices by that city first
+      if (filters.selectedCity) {
+        const cityDevices = filtered.filter(d => d.kota === filters.selectedCity);
+        const cityDeviceIds = cityDevices.map(d => d.device_id_unik);
+        relevantData = relevantData.filter(r => cityDeviceIds.includes(r.device_id_unik));
+      }
+
       // Apply date filters if set
       if (filters.startDate || filters.endDate) {
         relevantData = relevantData.filter(r => {
@@ -260,6 +267,18 @@ const Dashboard: React.FC = () => {
       {/* Filter Panel */}
       {/* <FilterPanel /> */}
 
+      {/* Selected City Banner */}
+      {filters.selectedCity && (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-xl px-4 py-3">
+          <p className="text-xs text-slate-600 font-semibold mb-1">
+            {t('dashboard:analytics.viewingLocation') || 'Viewing Location'}
+          </p>
+          <p className="text-lg font-bold text-emerald-700">
+            {filters.selectedCity}
+          </p>
+        </div>
+      )}
+
       {/* Charts Section */}
       <ChartContainer
         chartView={chartView}
@@ -267,6 +286,7 @@ const Dashboard: React.FC = () => {
         dailyData={chartData}
         weeklyData={weeklyChartData}
         trendData={trendData}
+        selectedCity={filters.selectedCity || undefined}
         mapRef={mapRef}
         barChartRef={barChartRef}
         statusTrendRef={statusTrendRef}

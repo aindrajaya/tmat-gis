@@ -54,6 +54,27 @@
     "exporting": "Exporting..."
   },
   "analytics": {
-    "viewingLocation": "Viewing Location"
+    "viewingLocation": "Viewing Location",
+    "currentStatus": "Current Status",
+    "waterLevelStatus": "Water Level Status",
+    "temperature": "Temperature",
+    "historicalData": "Historical TMAT Data",
+    "tmatHistory": "TMAT History",
+    "loading": "Loading data...",
+    "noHistoricalData": "No historical data available for the selected date range",
+    "deviceInfo": "Device Information",
+    "deviceId": "Device ID",
+    "city": "City",
+    "province": "Province",
+    "companyType": "Company Type",
+    "coordinates": "Coordinates",
+    "lastUpdated": "Last updated",
+    "viewDetails": "View Details",
+    "minimize": "Minimize",
+    "expand": "Expand",
+    "close": "Close",
+    "deviceGroup": "Device Group",
+    "devicesAtLocation": "devices at this location",
+    "noData": "No data available"
   }
 }

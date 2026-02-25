@@ -54,6 +54,27 @@
     "exporting": "Mengekspor..."
   },
   "analytics": {
-    "viewingLocation": "Menampilkan Lokasi"
+    "viewingLocation": "Menampilkan Lokasi",
+    "currentStatus": "Status Saat Ini",
+    "waterLevelStatus": "Status Ketinggian",
+    "temperature": "Suhu",
+    "historicalData": "Data Historis TMAT",
+    "tmatHistory": "Riwayat TMAT",
+    "loading": "Memuat data...",
+    "noHistoricalData": "Tidak ada data historis tersedia untuk rentang tanggal yang dipilih",
+    "deviceInfo": "Informasi Perangkat",
+    "deviceId": "ID Perangkat",
+    "city": "Kota",
+    "province": "Provinsi",
+    "companyType": "Jenis Perusahaan",
+    "coordinates": "Koordinat",
+    "lastUpdated": "Terakhir diperbarui",
+    "viewDetails": "Lihat Detail",
+    "minimize": "Perkecil",
+    "expand": "Perbesar",
+    "close": "Tutup",
+    "deviceGroup": "Grup Perangkat",
+    "devicesAtLocation": "perangkat di lokasi ini",
+    "noData": "Data tidak tersedia"
   }
 }

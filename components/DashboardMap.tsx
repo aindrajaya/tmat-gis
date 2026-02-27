@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, forwardRef, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, forwardRef, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -13,6 +13,10 @@ import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
 import AdvancedFilterPanel from './AdvancedFilterPanel';
 import DeviceAnalyticsPanel from './DeviceAnalyticsPanel';
+import VoronoiLayer from './map/VoronoiLayer';
+import CityMarkersLayer from './map/CityMarkersLayer';
+import DeviceMarkersLayer from './map/DeviceMarkersLayer';
+import VillageVoronoiLayer from './map/VillageVoronoiLayer';
 
 // Voronoi tessellation using d3-delaunay (efficient implementation)
 const createVoronoiPolygons = (devices: Device[], bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
@@ -95,200 +99,6 @@ const createWaterDropletIcon = (color: string = '#3b82f6', count?: number) => {
   });
 };
 
-// City Marker Component with Map Access
-const CityMarkerComponent: React.FC<{
-  cityKey: string;
-  cityData: any;
-  markerColor: string;
-  isIndonesian: boolean;
-  onCityClick: (cityName: string) => void;
-}> = ({ cityKey, cityData, markerColor, isIndonesian, onCityClick }) => {
-  const map = useMap();
-  const total = cityData.devices.length;
-  const { stats } = cityData;
-
-  return (
-    <Marker
-      key={`city-${cityKey}`}
-      position={[cityData.centerLat, cityData.centerLng]}
-      icon={L.divIcon({
-        html: `
-          <div style="
-            background-color: rgba(255, 255, 255, 0.45);
-            border: 1px solid ${markerColor};
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            font-weight: bold;
-            font-size: 14px;
-            color: ${markerColor};
-            cursor: pointer;
-            transition: all 0.2s ease;
-          "
-          onmouseover="this.style.transform='scale(1.1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.95)';"
-          onmouseout="this.style.transform='scale(1)'; this.style.backgroundColor='rgba(255, 255, 255, 0.85)';"
-          >
-            ${total}
-          </div>
-        `,
-        className: 'city-marker',
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-        popupAnchor: [0, -20],
-      })}
-      eventHandlers={{
-        click: (e) => {
-          // Zoom to city location using map reference
-          console.log('[CityMarkerComponent] ===== CLICK TRIGGERED =====');
-          console.log('[CityMarkerComponent] Clicked city:', cityData.city);
-          console.log('[CityMarkerComponent] Coords:', [cityData.centerLat, cityData.centerLng]);
-          console.log('[CityMarkerComponent] Current zoom:', map.getZoom());
-          
-          // Stop event propagation to prevent polygon clicks
-          e.originalEvent?.stopPropagation();
-          
-          // Update selected city in context first
-          onCityClick(cityData.city);
-          
-          // Use setTimeout to ensure zoom happens after React batching
-          setTimeout(() => {
-            console.log('[CityMarkerComponent] Executing delayed setView');
-            
-            // Offset the latitude slightly to account for UI elements at the top
-            // At zoom level 11, ~0.015 degrees shift down (compensates for top panels)
-            const offsetLat = cityData.centerLat + 0.015;
-            
-            map.setView([offsetLat, cityData.centerLng], 11, {
-              animate: true
-            });
-            console.log('[CityMarkerComponent] Zoom after setView:', map.getZoom());
-          }, 100);
-        }
-      }}
-    >
-      <Popup maxWidth={320} minWidth={280}>
-        <div className="p-3">
-          <h3 className="font-bold text-slate-800 text-base mb-1">
-            {cityData.city}
-          </h3>
-          <p className="text-xs text-slate-500 mb-3">{cityData.provinsi}</p>
-          
-          <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-emerald-800">
-                {isIndonesian ? 'Total Perangkat' : 'Total Devices'}
-              </span>
-              <span className="text-xl font-bold text-emerald-600">{total}</span>
-            </div>
-          </div>
-
-          <div className="space-y-2 mb-3">
-            <h4 className="text-xs font-bold text-slate-700 mb-2">
-              {isIndonesian ? 'Statistik Status:' : 'Status Statistics:'}
-            </h4>
-            
-            {stats.safe > 0 && (
-              <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
-              </div>
-            )}
-
-            {stats.low > 0 && (
-              <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Rendah' : 'Low'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-green-700">{stats.low}</span>
-              </div>
-            )}
-
-            {stats.medium > 0 && (
-              <div className="flex items-center justify-between p-2 bg-cyan-50 rounded">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Sedang' : 'Medium'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
-              </div>
-            )}
-
-            {stats.high > 0 && (
-              <div className="flex items-center justify-between p-2 bg-yellow-50 rounded">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#FFFF00]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Tinggi' : 'High'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-yellow-700">{stats.high}</span>
-              </div>
-            )}
-
-            {stats.veryhigh > 0 && (
-              <div className="flex items-center justify-between p-2 bg-amber-50 rounded">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#FFC000]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-amber-700">{stats.veryhigh}</span>
-              </div>
-            )}
-
-            {stats.extreme > 0 && (
-              <div className="flex items-center justify-between p-2 bg-red-50 rounded">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Ekstrim' : 'Extreme'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
-              </div>
-            )}
-
-            {stats.offline > 0 && (
-              <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-slate-400"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Offline' : 'Offline'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-slate-700">{stats.offline}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="pt-2 border-t border-slate-200">
-            <p className="text-xs text-slate-500 italic">
-              {isIndonesian 
-                ? 'Klik pada zona warna untuk detail perangkat'
-                : 'Click on colored zones for device details'}
-            </p>
-          </div>
-        </div>
-      </Popup>
-    </Marker>
-  );
-};
-
 // Water level status classification based on TMAT values
 // TMAT value indicates water level depth (negative = below surface)
 const getWaterLevelStatus = (tmatValue: number) => {
@@ -354,22 +164,61 @@ const MapBoundsHandler: React.FC<{ devices: Device[] }> = ({ devices }) => {
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Only auto-fit bounds on initial load, not on subsequent changes
-    if (devices && devices.length > 0 && !initializedRef.current) {
-      const bounds = L.latLngBounds(
-        devices.map(d => [d.latitude, d.longitude] as [number, number])
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
-      initializedRef.current = true;
-    }
+    // Disabled auto-fit to preserve default zoom level (Indonesia nation view)
+    // Users can manually zoom to see devices
+    // if (devices && devices.length > 0 && !initializedRef.current) {
+    //   const bounds = L.latLngBounds(
+    //     devices.map(d => [d.latitude, d.longitude] as [number, number])
+    //   );
+    //   map.fitBounds(bounds, { padding: [50, 50], maxZoom: 9 });
+    //   initializedRef.current = true;
+    // }
   }, [devices, map]);
 
   return null;
 };
 
+// Component to fix map rendering issues
+const MapInitializer: React.FC = () => {
+  const map = useMap();
+  
+  useEffect(() => {
+    // Small delay to ensure DOM is ready, then invalidate size
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [map]);
+  
+  return null;
+};
+
+// Component to auto-zoom when village layer is enabled
+const VillageLayerZoomHandler: React.FC<{ showDistrictLayer: boolean }> = ({ showDistrictLayer }) => {
+  const map = useMap();
+  const hasZoomedRef = useRef(false);
+  
+  useEffect(() => {
+    if (showDistrictLayer && !hasZoomedRef.current) {
+      const currentZoom = map.getZoom();
+      // Auto-zoom to 7 if current zoom is too low to see village layer
+      if (currentZoom < 7) {
+        map.setZoom(7, { animate: true });
+        hasZoomedRef.current = true;
+      }
+    }
+    if (!showDistrictLayer) {
+      hasZoomedRef.current = false;
+    }
+  }, [showDistrictLayer, map]);
+  
+  return null;
+};
+
 const VectorTileLayer: React.FC<{
   filters?: { provinsi?: string; kabupaten?: string; kecamatan?: string };
-}> = ({ filters }) => {
+}> = React.memo(({ filters }) => {
   const safeFilters = {
     provinsi: filters?.provinsi || '',
     kabupaten: filters?.kabupaten || '',
@@ -501,7 +350,7 @@ const VectorTileLayer: React.FC<{
         }
       },
       interactive: true,
-      minZoom: 0,
+      minZoom: 8,
       maxZoom: 18,
       maxNativeZoom: 10,
       bounds: L.latLngBounds(
@@ -572,10 +421,15 @@ const VectorTileLayer: React.FC<{
   }, [map, safeFilters.provinsi, safeFilters.kabupaten, safeFilters.kecamatan]);
 
   return null;
-};
+}, (prevProps, nextProps) => {
+  // Only re-render if filters actually changed
+  return prevProps.filters?.provinsi === nextProps.filters?.provinsi &&
+         prevProps.filters?.kabupaten === nextProps.filters?.kabupaten &&
+         prevProps.filters?.kecamatan === nextProps.filters?.kecamatan;
+});
 
 // Legend component
-const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({ onToggle, isOpen }) => {
+const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean; showDistrictLayer?: boolean }> = ({ onToggle, isOpen, showDistrictLayer }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
 
@@ -656,6 +510,33 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({
               <p className="text-[10px] text-slate-500">{'> 80 cm'}</p>
             </div>
           </div>
+
+          {/* Additional legend item for non-affected areas when district layer is active */}
+          {showDistrictLayer && (
+            <>
+              <div className="border-t border-slate-200 my-2 pt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#94a3b8] opacity-50 flex-shrink-0"></div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-700 text-xs">
+                      {isIndonesian ? 'Tidak Terdampak' : 'Not Affected'}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {isIndonesian ? 'Area tanpa perangkat' : 'No device coverage'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-emerald-50 border border-emerald-200 rounded-md p-2 mt-2">
+                <p className="text-[10px] text-emerald-800 leading-relaxed">
+                  {isIndonesian 
+                    ? 'Warna desa menunjukkan status air dari perangkat terdekat berdasarkan area cakupan terbesar'
+                    : 'Village colors show water status from the nearest device based on largest coverage area'}
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -671,8 +552,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   const [legendOpen, setLegendOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);  
-  const [mapKey, setMapKey] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -682,14 +562,32 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   // Toggle settings
   const [showDistrictLayer, setShowDistrictLayer] = useState(false);
   const [showMarkers, setShowMarkers] = useState(false);
+  
+  // Persistent cache for village-voronoi overlap calculations
+  // This persists across toggle on/off to avoid recalculation
+  const villageOverlapCacheRef = useRef<Map<string | number, any>>(new Map());
+  const [isCalculatingVillages, setIsCalculatingVillages] = useState(false);
+
+  // Memoized event handlers to prevent re-creation on every render
+  const handleDeviceSelect = useCallback((device: Device | null) => {
+    setSelectedDevice(device);
+  }, []);
+
+  const handlePolygonClick = useCallback((device: Device) => {
+    setSelectedDevice(device);
+  }, []);
+
+  const handleCityClick = useCallback((cityName: string) => {
+    updateFilter('selectedCity', cityName);
+  }, [updateFilter]);
 
   const indonesiaBounds = L.latLngBounds(
     L.latLng(-10.9431, 95.0108),
     L.latLng(5.9072, 141.0194)
   );
 
-  // Center on Indonesia roughly
-  const center: [number, number] = [-2.5489, 118.0149];
+  // Center on Indonesia (geographic center of archipelago)
+  const center: [number, number] = [-2.5, 118.0];
 
   // Get unique provinces from devices data
   const provinceOptions = useMemo(() => {
@@ -723,14 +621,6 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     });
     return Array.from(kabupaten).sort();
   }, [devices, filters.provinsi, enforcedProvinsi]);
-
-  // Force map re-render when realtime data loads
-  useEffect(() => {
-    if (realtimeData && realtimeData.length > 0) {
-      console.log('[DashboardMap] Realtime data loaded, forcing map update');
-      setMapKey(prev => prev + 1);
-    }
-  }, [realtimeData]);
 
   // Apply filters to devices
   const filteredDevices = useMemo(() => {
@@ -868,6 +758,23 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       };
     }).filter(Boolean);
   }, [filteredDevices, deviceDataMap]);
+
+  // Debug voronoi polygons for village layer
+  useEffect(() => {
+    if (showDistrictLayer) {
+      console.log('Voronoi polygons for village layer:', {
+        count: voronoiPolygons.length,
+        sample: voronoiPolygons.slice(0, 3).map(vp => ({
+          deviceId: vp.device.device_id_unik,
+          color: vp.status.color,
+          level: vp.status.level,
+          hasRtData: !!vp.rtData,
+          polygonCoordsCount: vp.polygonCoords?.length,
+          firstCoord: vp.polygonCoords?.[0]
+        }))
+      });
+    }
+  }, [showDistrictLayer, voronoiPolygons]);
 
   // Group devices by location (using lat/lng rounded to 3 decimals for clustering)
   const deviceGroups = useMemo(() => {
@@ -1183,15 +1090,19 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       )}
       
       <MapContainer 
-        key={mapKey}
+        key={selectedBasemap}
         center={center} 
         zoom={5} 
-        minZoom={0}
+        minZoom={4}
         maxZoom={18}
-        maxBounds={indonesiaBounds}
-        maxBoundsViscosity={1.0}
+        worldCopyJump={true}
         preferCanvas={true}
         style={{ height: '100%', width: '100%' }}
+        whenReady={(map) => {
+          setTimeout(() => {
+            map.target.invalidateSize();
+          }, 100);
+        }}
       >
         {/* Dynamic Basemap Layer */}
         {selectedBasemap === 'osm' && (
@@ -1215,279 +1126,48 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         )}
         
         <MapBoundsHandler devices={filteredDevices} />
-        {showDistrictLayer && <VectorTileLayer filters={{ provinsi: filters.provinsi, kabupaten: filters.kabupaten, kecamatan: filters.kecamatan }} />}
+        <MapInitializer />
+        <VillageLayerZoomHandler showDistrictLayer={showDistrictLayer} />
         
-        {/* Render Voronoi Polygons - Water Level Zones */}
-        {!realtimeLoading && voronoiPolygons.map((data, index) => {
-          if (!data) return null;
-          const { device, rtData, status, polygonCoords } = data;
-          
-          console.log('[DashboardMap] Rendering polygon for:', device.device_id_unik, 'status:', status.level);
-          
-          return (
-            <Polygon
-              key={`polygon-${device.id}`}
-              positions={polygonCoords as any}
-              pathOptions={{
-                fillColor: status.color,
-                fillOpacity: 0.4,
-                color: status.color,
-                weight: 2,
-                opacity: 0.7
-              }}
-              eventHandlers={{
-                click: () => setSelectedDevice(device)
-              }}
-            >
-              <Popup maxWidth={280} minWidth={240}>
-                <div className="p-1">
-                  <h3 className="font-bold text-slate-800 text-sm mb-2">{device.device_id_unik}</h3>
-                  <p className="text-xs text-slate-600 mb-3">
-                    {device.kota}, {device.provinsi}
-                  </p>
-                  
-                  <div className="space-y-2 mb-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500">
-                        {isIndonesian ? 'Status' : 'Status'}:
-                      </span>
-                      <div 
-                        className="text-xs px-2 py-1 rounded-full font-medium"
-                        style={{ 
-                          backgroundColor: `${status.color}20`, 
-                          color: status.color 
-                        }}
-                      >
-                        {status.level}
-                      </div>
-                    </div>
-                    
-                    {rtData ? (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-slate-500">
-                            {isIndonesian ? 'Ketinggian' : 'Water Level'}:
-                          </span>
-                          <span className="text-xs font-semibold text-slate-700">
-                            {status.range}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-slate-500">TMAT:</span>
-                          <span className="text-xs font-semibold text-slate-700">
-                            {rtData.tmat_value.toFixed(2)}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-slate-500">
-                            {isIndonesian ? 'Suhu' : 'Temperature'}:
-                          </span>
-                          <span className="text-xs font-semibold text-slate-700">
-                            {rtData.suhu_value.toFixed(1)}°C
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-slate-500">pH:</span>
-                          <span className="text-xs font-semibold text-slate-700">
-                            {rtData.ph_value.toFixed(2)}
-                          </span>
-                        </div>
-
-                        <div className="pt-2 border-t border-slate-100">
-                          <p className="text-xs text-slate-500">
-                            {isIndonesian ? 'Terakhir diperbarui' : 'Last updated'}:
-                          </p>
-                          <p className="text-xs font-medium text-slate-700">
-                            {rtData.timestamp_data}
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="pt-2 pb-2">
-                        <p className="text-xs text-slate-500 italic text-center">
-                          {isIndonesian ? 'Tidak ada data realtime tersedia' : 'No realtime data available'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Popup>
-            </Polygon>
-          );
-        })}
+        {/* Conditional layer rendering: Village layer with Voronoi coloring OR standalone Voronoi */}
+        {showDistrictLayer ? (
+          <VillageVoronoiLayer 
+            filters={{ provinsi: filters.provinsi, kabupaten: filters.kabupaten, kecamatan: filters.kecamatan }}
+            voronoiPolygons={voronoiPolygons}
+            isIndonesian={isIndonesian}
+            filteredDevices={filteredDevices}
+            overlapCache={villageOverlapCacheRef.current}
+            onCalculationStart={() => setIsCalculatingVillages(true)}
+            onCalculationEnd={() => setIsCalculatingVillages(false)}
+          />
+        ) : (
+          <VoronoiLayer 
+            polygons={voronoiPolygons}
+            isLoading={realtimeLoading}
+            onPolygonClick={handlePolygonClick}
+            isIndonesian={isIndonesian}
+          />
+        )}
 
         {/* Render city-level markers - Always visible */}
-        {!realtimeLoading && Array.from(cityGroups.entries()).map(([cityKey, cityData]) => {
-          const { stats } = cityData;
-          
-          // Determine color based on most dominant status (prioritize severity)
-          let markerColor = '#06b6d4'; // default cyan
-          const statusCounts = [
-            { color: '#EE0000', count: stats.extreme },     // red - extreme
-            { color: '#FFC000', count: stats.veryhigh },    // orange - very high
-            { color: '#FFFF00', count: stats.high },        // yellow - high
-            { color: '#00B0F0', count: stats.medium },      // light blue - medium
-            { color: '#00B050', count: stats.low },         // green - low
-            { color: '#703CA0', count: stats.safe },        // purple - no risk
-            { color: '#94a3b8', count: stats.offline }      // gray - offline
-          ];
-          
-          // Find the status with the highest count (highest priority)
-          const dominant = statusCounts.reduce((max, current) => 
-            current.count > max.count ? current : max
-          );
-          
-          if (dominant.count > 0) {
-            markerColor = dominant.color;
-          }
-
-          return (
-            <CityMarkerComponent
-              key={`city-marker-${cityKey}`}
-              cityKey={cityKey}
-              cityData={cityData}
-              markerColor={markerColor}
-              isIndonesian={isIndonesian}
-              onCityClick={(cityName) => updateFilter('selectedCity', cityName)}
-            />
-          );
-        })}
+        <CityMarkersLayer
+          cityGroups={cityGroups}
+          isLoading={realtimeLoading}
+          isIndonesian={isIndonesian}
+          onCityClick={handleCityClick}
+        />
 
         {/* Render grouped device markers on top - Conditional */}
-        {showMarkers && !realtimeLoading && Array.from(deviceGroups.entries()).map(([locationKey, groupDevices]: [string, Device[]]) => {
-          const firstDevice = groupDevices[0];
-          const deviceCount = groupDevices.length;
-          
-          // Get the most critical status in the group (prioritize severity)
-          let mostCriticalColor = '#06b6d4';
-          groupDevices.forEach(device => {
-            const rtData = deviceDataMap.get(device.device_id_unik);
-            if (rtData) {
-              const status = getWaterLevelStatus(rtData.tmat_value);
-              if (status.severity === 'extreme') mostCriticalColor = '#EE0000';
-              else if (status.severity === 'veryhigh' && mostCriticalColor !== '#EE0000') mostCriticalColor = '#FFC000';
-              else if (status.severity === 'high' && !['#EE0000', '#FFC000'].includes(mostCriticalColor)) mostCriticalColor = '#FFFF00';
-              else if (status.severity === 'medium' && !['#EE0000', '#FFC000', '#FFFF00'].includes(mostCriticalColor)) mostCriticalColor = '#00B0F0';
-              else if (status.severity === 'low' && !['#EE0000', '#FFC000', '#FFFF00', '#00B0F0'].includes(mostCriticalColor)) mostCriticalColor = '#00B050';
-            }
-          });
-
-          return (
-            <Marker 
-              key={`marker-${locationKey}`}
-              position={[firstDevice.latitude, firstDevice.longitude]} 
-              icon={createWaterDropletIcon(mostCriticalColor, deviceCount)}
-            >
-              {deviceCount > 1 ? (
-                <Popup maxWidth={320} minWidth={280}>
-                  <div className="p-2">
-                    <h3 className="font-bold text-slate-800 text-sm mb-2">
-                      {isIndonesian ? 'Grup Perangkat' : 'Device Group'}
-                    </h3>
-                    <p className="text-xs text-slate-600 mb-3">
-                      {firstDevice.kota}, {firstDevice.provinsi}
-                    </p>
-                    <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-100">
-                      <p className="text-xs text-emerald-700 font-semibold">
-                        {deviceCount} {isIndonesian ? 'perangkat di lokasi ini' : 'devices at this location'}
-                      </p>
-                    </div>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {groupDevices.map(device => {
-                        const rtData = deviceDataMap.get(device.device_id_unik);
-                        const status = rtData ? getWaterLevelStatus(rtData.tmat_value) : null;
-                        return (
-                          <button
-                            key={device.id}
-                            onClick={() => setSelectedDevice(device)}
-                            className="w-full flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-emerald-100 transition-colors text-left peer group/item"
-                          >
-                            <span className="text-xs font-medium text-slate-700">{device.device_id_unik}</span>
-                            {status && (
-                              <div 
-                                className="text-xs px-2 py-0.5 rounded-full font-medium"
-                                style={{ 
-                                  backgroundColor: `${status.color}20`, 
-                                  color: status.color 
-                                }}
-                              >
-                                {status.level}
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </Popup>
-              ) : (
-                <Popup maxWidth={320} minWidth={280}>
-                  <div className="p-3">
-                    <h3 className="font-bold text-slate-800 text-sm mb-1">
-                      {firstDevice.device_id_unik}
-                    </h3>
-                    <p className="text-xs text-slate-600 mb-3">
-                      {firstDevice.kota}, {firstDevice.provinsi}
-                    </p>
-                    
-                    <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-emerald-700">
-                          {isIndonesian ? 'Status' : 'Status'}
-                        </span>
-                        {deviceDataMap.has(firstDevice.device_id_unik) && (
-                          <span className="text-xs font-bold text-emerald-700">
-                            {getWaterLevelStatus(deviceDataMap.get(firstDevice.device_id_unik)?.tmat_value || 0).level}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {deviceDataMap.has(firstDevice.device_id_unik) ? (
-                        <>
-                          <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                            <span className="text-xs text-slate-600">
-                              {isIndonesian ? 'Nilai TMAT' : 'TMAT Value'}
-                            </span>
-                            <span className="text-xs font-bold text-slate-800">
-                              {deviceDataMap.get(firstDevice.device_id_unik)?.tmat_value.toFixed(2)} cm
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                            <span className="text-xs text-slate-600">
-                              {isIndonesian ? 'Waktu Update' : 'Last Update'}
-                            </span>
-                            <span className="text-xs font-bold text-slate-800">
-                              {new Date(deviceDataMap.get(firstDevice.device_id_unik)?.timestamp || '').toLocaleTimeString()}
-                            </span>
-                          </div>
-                          
-                          <button
-                            onClick={() => setSelectedDevice(firstDevice)}
-                            className="w-full mt-3 px-3 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-semibold rounded-lg hover:shadow-lg transition-shadow"
-                          >
-                            {isIndonesian ? 'Lihat Detail' : 'View Details'}
-                          </button>
-                        </>
-                      ) : (
-                        <div className="p-2 bg-slate-50 rounded text-center">
-                          <p className="text-xs text-slate-500 italic">
-                            {isIndonesian ? 'Data tidak tersedia' : 'No data available'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Popup>
-              )}
-            </Marker>
-          );
-        })}
+        <DeviceMarkersLayer
+          deviceGroups={deviceGroups}
+          deviceDataMap={deviceDataMap}
+          showMarkers={showMarkers}
+          isLoading={realtimeLoading}
+          isIndonesian={isIndonesian}
+          onDeviceSelect={handleDeviceSelect}
+          getWaterLevelStatus={getWaterLevelStatus}
+          createWaterDropletIcon={createWaterDropletIcon}
+        />
       </MapContainer>
 
       {/* Settings Panel - Bottom Left (above stats) */}
@@ -1538,13 +1218,18 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
             </div>
 
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1">
                 <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                 </svg>
-                <span className="text-sm font-medium text-slate-700">
-                  {isIndonesian ? 'Layer Distrik/Desa' : 'District/Village Layer'}
-                </span>
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-slate-700 block">
+                    {isIndonesian ? 'Layer Distrik/Desa' : 'District/Village Layer'}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5" title={isIndonesian ? 'Desa akan diwarnai sesuai status air device terdekat' : 'Villages colored by nearest device water status'}>
+                    {isIndonesian ? 'Auto-pewarnaan berdasarkan status air' : 'Auto-colored by water status'}
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setShowDistrictLayer(!showDistrictLayer)}
@@ -1568,8 +1253,8 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
               </p>
               <p className="text-xs text-slate-500 italic mt-1">
                 {isIndonesian
-                  ? 'Aktifkan layer untuk menampilkan batas distrik/desa'
-                  : 'Enable layer to display district/village boundaries'}
+                  ? 'Layer desa menampilkan area terdampak dengan pewarnaan otomatis'
+                  : 'Village layer shows affected areas with automatic coloring'}
               </p>
             </div>
           </div>
@@ -1771,7 +1456,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       </div>
 
       {/* Legend Panel */}
-      <WaterLevelLegend isOpen={legendOpen} onToggle={() => setLegendOpen(!legendOpen)} />
+      <WaterLevelLegend isOpen={legendOpen} onToggle={() => setLegendOpen(!legendOpen)} showDistrictLayer={showDistrictLayer} />
 
       {/* Basemap Switcher */}
       <div className="absolute bottom-24 right-4 z-[999]">
@@ -1869,6 +1554,40 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         realtimeData={selectedDeviceData}
         onClose={() => setSelectedDevice(null)}
       />
+      
+      {/* Village Calculation Loading Overlay */}
+      {isCalculatingVillages && (
+        <div className="absolute inset-0 pointer-events-none z-[1000] flex items-center justify-center">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl px-8 py-6 flex flex-col items-center gap-4 border-2 border-emerald-200">
+            <div className="relative">
+              {/* Animated spinner */}
+              <div className="w-16 h-16 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
+              {/* Pulsing circles */}
+              <div className="absolute inset-0 w-16 h-16 border-4 border-emerald-300 rounded-full animate-ping opacity-20"></div>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-slate-800 mb-1">
+                {isIndonesian ? 'Menghitung Cakupan Desa...' : 'Calculating Village Coverage...'}
+              </p>
+              <p className="text-sm text-slate-600">
+                {isIndonesian 
+                  ? 'Menganalisis overlap dengan perangkat' 
+                  : 'Analyzing overlap with devices'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {isIndonesian 
+                  ? 'Estimasi: 1-3 detik' 
+                  : 'Estimated: 1-3 seconds'}
+              </p>
+              <div className="mt-3 flex items-center justify-center gap-1">
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

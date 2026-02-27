@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@turf/turf": "^7.3.4",
     "cors": "^2.8.5",
     "d3-delaunay": "^6.0.4",
     "express": "^5.1.0",

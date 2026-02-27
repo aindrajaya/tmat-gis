@@ -16,6 +16,7 @@ import DeviceAnalyticsPanel from './DeviceAnalyticsPanel';
 import VoronoiLayer from './map/VoronoiLayer';
 import CityMarkersLayer from './map/CityMarkersLayer';
 import DeviceMarkersLayer from './map/DeviceMarkersLayer';
+import VillageVoronoiLayer from './map/VillageVoronoiLayer';
 
 // Voronoi tessellation using d3-delaunay (efficient implementation)
 const createVoronoiPolygons = (devices: Device[], bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => {
@@ -160,17 +161,58 @@ interface Props {
 // Component to handle automatic map bounds fitting
 const MapBoundsHandler: React.FC<{ devices: Device[] }> = ({ devices }) => {
   const map = useMap();
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Auto-fit bounds whenever devices change (filter updates, etc.)
-    if (devices && devices.length > 0) {
-      const bounds = L.latLngBounds(
-        devices.map(d => [d.latitude, d.longitude] as [number, number])
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
-    }
+    // Disabled auto-fit to preserve default zoom level (Indonesia nation view)
+    // Users can manually zoom to see devices
+    // if (devices && devices.length > 0 && !initializedRef.current) {
+    //   const bounds = L.latLngBounds(
+    //     devices.map(d => [d.latitude, d.longitude] as [number, number])
+    //   );
+    //   map.fitBounds(bounds, { padding: [50, 50], maxZoom: 9 });
+    //   initializedRef.current = true;
+    // }
   }, [devices, map]);
 
+  return null;
+};
+
+// Component to fix map rendering issues
+const MapInitializer: React.FC = () => {
+  const map = useMap();
+  
+  useEffect(() => {
+    // Small delay to ensure DOM is ready, then invalidate size
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [map]);
+  
+  return null;
+};
+
+// Component to auto-zoom when village layer is enabled
+const VillageLayerZoomHandler: React.FC<{ showDistrictLayer: boolean }> = ({ showDistrictLayer }) => {
+  const map = useMap();
+  const hasZoomedRef = useRef(false);
+  
+  useEffect(() => {
+    if (showDistrictLayer && !hasZoomedRef.current) {
+      const currentZoom = map.getZoom();
+      // Auto-zoom to 7 if current zoom is too low to see village layer
+      if (currentZoom < 7) {
+        map.setZoom(7, { animate: true });
+        hasZoomedRef.current = true;
+      }
+    }
+    if (!showDistrictLayer) {
+      hasZoomedRef.current = false;
+    }
+  }, [showDistrictLayer, map]);
+  
   return null;
 };
 
@@ -308,7 +350,7 @@ const VectorTileLayer: React.FC<{
         }
       },
       interactive: true,
-      minZoom: 0,
+      minZoom: 8,
       maxZoom: 18,
       maxNativeZoom: 10,
       bounds: L.latLngBounds(
@@ -387,7 +429,7 @@ const VectorTileLayer: React.FC<{
 });
 
 // Legend component
-const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({ onToggle, isOpen }) => {
+const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean; showDistrictLayer?: boolean }> = ({ onToggle, isOpen, showDistrictLayer }) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
 
@@ -468,6 +510,33 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean }> = ({
               <p className="text-[10px] text-slate-500">{'> 80 cm'}</p>
             </div>
           </div>
+
+          {/* Additional legend item for non-affected areas when district layer is active */}
+          {showDistrictLayer && (
+            <>
+              <div className="border-t border-slate-200 my-2 pt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#94a3b8] opacity-50 flex-shrink-0"></div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-700 text-xs">
+                      {isIndonesian ? 'Tidak Terdampak' : 'Not Affected'}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {isIndonesian ? 'Area tanpa perangkat' : 'No device coverage'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-emerald-50 border border-emerald-200 rounded-md p-2 mt-2">
+                <p className="text-[10px] text-emerald-800 leading-relaxed">
+                  {isIndonesian 
+                    ? 'Warna desa menunjukkan status air dari perangkat terdekat berdasarkan area cakupan terbesar'
+                    : 'Village colors show water status from the nearest device based on largest coverage area'}
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -493,6 +562,11 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   // Toggle settings
   const [showDistrictLayer, setShowDistrictLayer] = useState(false);
   const [showMarkers, setShowMarkers] = useState(false);
+  
+  // Persistent cache for village-voronoi overlap calculations
+  // This persists across toggle on/off to avoid recalculation
+  const villageOverlapCacheRef = useRef<Map<string | number, any>>(new Map());
+  const [isCalculatingVillages, setIsCalculatingVillages] = useState(false);
 
   // Memoized event handlers to prevent re-creation on every render
   const handleDeviceSelect = useCallback((device: Device | null) => {
@@ -512,8 +586,8 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     L.latLng(5.9072, 141.0194)
   );
 
-  // Center on Indonesia roughly
-  const center: [number, number] = [-2.5489, 118.0149];
+  // Center on Indonesia (geographic center of archipelago)
+  const center: [number, number] = [-2.5, 118.0];
 
   // Get unique provinces from devices data
   const provinceOptions = useMemo(() => {
@@ -684,6 +758,23 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       };
     }).filter(Boolean);
   }, [filteredDevices, deviceDataMap]);
+
+  // Debug voronoi polygons for village layer
+  useEffect(() => {
+    if (showDistrictLayer) {
+      console.log('Voronoi polygons for village layer:', {
+        count: voronoiPolygons.length,
+        sample: voronoiPolygons.slice(0, 3).map(vp => ({
+          deviceId: vp.device.device_id_unik,
+          color: vp.status.color,
+          level: vp.status.level,
+          hasRtData: !!vp.rtData,
+          polygonCoordsCount: vp.polygonCoords?.length,
+          firstCoord: vp.polygonCoords?.[0]
+        }))
+      });
+    }
+  }, [showDistrictLayer, voronoiPolygons]);
 
   // Group devices by location (using lat/lng rounded to 3 decimals for clustering)
   const deviceGroups = useMemo(() => {
@@ -999,14 +1090,19 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       )}
       
       <MapContainer 
+        key={selectedBasemap}
         center={center} 
-        zoom={6} 
-        minZoom={5}
+        zoom={5} 
+        minZoom={4}
         maxZoom={18}
-        maxBounds={indonesiaBounds}
-        maxBoundsViscosity={1.0}
+        worldCopyJump={true}
         preferCanvas={true}
         style={{ height: '100%', width: '100%' }}
+        whenReady={(map) => {
+          setTimeout(() => {
+            map.target.invalidateSize();
+          }, 100);
+        }}
       >
         {/* Dynamic Basemap Layer */}
         {selectedBasemap === 'osm' && (
@@ -1030,15 +1126,28 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         )}
         
         <MapBoundsHandler devices={filteredDevices} />
-        {showDistrictLayer && <VectorTileLayer filters={{ provinsi: filters.provinsi, kabupaten: filters.kabupaten, kecamatan: filters.kecamatan }} />}
+        <MapInitializer />
+        <VillageLayerZoomHandler showDistrictLayer={showDistrictLayer} />
         
-        {/* Render Voronoi Polygons - Water Level Zones */}
-        <VoronoiLayer 
-          polygons={voronoiPolygons}
-          isLoading={realtimeLoading}
-          onPolygonClick={handlePolygonClick}
-          isIndonesian={isIndonesian}
-        />
+        {/* Conditional layer rendering: Village layer with Voronoi coloring OR standalone Voronoi */}
+        {showDistrictLayer ? (
+          <VillageVoronoiLayer 
+            filters={{ provinsi: filters.provinsi, kabupaten: filters.kabupaten, kecamatan: filters.kecamatan }}
+            voronoiPolygons={voronoiPolygons}
+            isIndonesian={isIndonesian}
+            filteredDevices={filteredDevices}
+            overlapCache={villageOverlapCacheRef.current}
+            onCalculationStart={() => setIsCalculatingVillages(true)}
+            onCalculationEnd={() => setIsCalculatingVillages(false)}
+          />
+        ) : (
+          <VoronoiLayer 
+            polygons={voronoiPolygons}
+            isLoading={realtimeLoading}
+            onPolygonClick={handlePolygonClick}
+            isIndonesian={isIndonesian}
+          />
+        )}
 
         {/* Render city-level markers - Always visible */}
         <CityMarkersLayer
@@ -1109,13 +1218,18 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
             </div>
 
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1">
                 <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                 </svg>
-                <span className="text-sm font-medium text-slate-700">
-                  {isIndonesian ? 'Layer Distrik/Desa' : 'District/Village Layer'}
-                </span>
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-slate-700 block">
+                    {isIndonesian ? 'Layer Distrik/Desa' : 'District/Village Layer'}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block mt-0.5" title={isIndonesian ? 'Desa akan diwarnai sesuai status air device terdekat' : 'Villages colored by nearest device water status'}>
+                    {isIndonesian ? 'Auto-pewarnaan berdasarkan status air' : 'Auto-colored by water status'}
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setShowDistrictLayer(!showDistrictLayer)}
@@ -1139,8 +1253,8 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
               </p>
               <p className="text-xs text-slate-500 italic mt-1">
                 {isIndonesian
-                  ? 'Aktifkan layer untuk menampilkan batas distrik/desa'
-                  : 'Enable layer to display district/village boundaries'}
+                  ? 'Layer desa menampilkan area terdampak dengan pewarnaan otomatis'
+                  : 'Village layer shows affected areas with automatic coloring'}
               </p>
             </div>
           </div>
@@ -1342,7 +1456,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       </div>
 
       {/* Legend Panel */}
-      <WaterLevelLegend isOpen={legendOpen} onToggle={() => setLegendOpen(!legendOpen)} />
+      <WaterLevelLegend isOpen={legendOpen} onToggle={() => setLegendOpen(!legendOpen)} showDistrictLayer={showDistrictLayer} />
 
       {/* Basemap Switcher */}
       <div className="absolute bottom-24 right-4 z-[999]">
@@ -1440,6 +1554,40 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         realtimeData={selectedDeviceData}
         onClose={() => setSelectedDevice(null)}
       />
+      
+      {/* Village Calculation Loading Overlay */}
+      {isCalculatingVillages && (
+        <div className="absolute inset-0 pointer-events-none z-[1000] flex items-center justify-center">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl px-8 py-6 flex flex-col items-center gap-4 border-2 border-emerald-200">
+            <div className="relative">
+              {/* Animated spinner */}
+              <div className="w-16 h-16 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
+              {/* Pulsing circles */}
+              <div className="absolute inset-0 w-16 h-16 border-4 border-emerald-300 rounded-full animate-ping opacity-20"></div>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-slate-800 mb-1">
+                {isIndonesian ? 'Menghitung Cakupan Desa...' : 'Calculating Village Coverage...'}
+              </p>
+              <p className="text-sm text-slate-600">
+                {isIndonesian 
+                  ? 'Menganalisis overlap dengan perangkat' 
+                  : 'Analyzing overlap with devices'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {isIndonesian 
+                  ? 'Estimasi: 1-3 detik' 
+                  : 'Estimated: 1-3 seconds'}
+              </p>
+              <div className="mt-3 flex items-center justify-center gap-1">
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

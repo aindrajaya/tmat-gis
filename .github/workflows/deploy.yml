@@ -36,6 +36,9 @@ jobs:
             # Copy nginx config
             cp docker/nginx.conf app/nginx.conf
             
+            # Prune Docker builder cache to fix extraction snapshot errors
+            docker builder prune -f
+
             # Rebuild and restart
             docker compose down
             docker compose up -d --build

@@ -6,6 +6,7 @@ import { MOCK_DEVICES, MOCK_REALTIME } from '../services/mockData';
 import { useFilters } from '../context/FilterContext';
 import TMATTrendChart from './charts/TMATTrendChart';
 import { X, ChevronUp, MapPin, Droplet, Thermometer, TestTube } from 'lucide-react';
+import { getWaterLevelStatus } from '../utils/waterLevelStatus';
 
 interface Props {
   selectedDevice: Device | null;
@@ -35,22 +36,6 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
   const historicalData: RealtimeData[] = (historicalDataFromApi && historicalDataFromApi.length > 0)
     ? historicalDataFromApi
     : MOCK_REALTIME.filter(r => r.device_id_unik === selectedDevice.device_id_unik);
-
-  const getWaterLevelStatus = (tmatValue: number) => {
-    if (tmatValue >= 400) {
-      return { level: isIndonesian ? 'Ekstrim' : 'Extreme', color: '#EE0000', severity: 'extreme', range: '≥ 400 cm' };
-    } else if (tmatValue >= 300) {
-      return { level: isIndonesian ? 'Sangat Tinggi' : 'Very High', color: '#FFC000', severity: 'veryhigh', range: '300 - 399 cm' };
-    } else if (tmatValue >= 200) {
-      return { level: isIndonesian ? 'Tinggi' : 'High', color: '#FFFF00', severity: 'high', range: '200 - 299 cm' };
-    } else if (tmatValue >= 100) {
-      return { level: isIndonesian ? 'Sedang' : 'Medium', color: '#00B0F0', severity: 'medium', range: '100 - 199 cm' };
-    } else if (tmatValue >= 50) {
-      return { level: isIndonesian ? 'Rendah' : 'Low', color: '#00B050', severity: 'low', range: '50 - 99 cm' };
-    } else {
-      return { level: isIndonesian ? 'Tidak Beresiko' : 'No Risk', color: '#703CA0', severity: 'safe', range: '< 50 cm' };
-    }
-  };
 
   // Format historical data for chart if available
   const trendChartData = useMemo(() => {
@@ -84,7 +69,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
       .sort((a, b) => new Date(b.timestamp_data).getTime() - new Date(a.timestamp_data).getTime())[0]
     ) ?? null;
 
-  const currentStatus = currentRealtime ? getWaterLevelStatus(currentRealtime.tmat_value) : null;
+  const currentStatus = currentRealtime ? getWaterLevelStatus(currentRealtime.tmat_value, isIndonesian) : null;
 
   return (
     <div

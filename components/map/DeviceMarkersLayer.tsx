@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Marker, Popup } from 'react-leaflet';
+import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Device, RealtimeData } from '../../types';
 
@@ -33,6 +33,14 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
   getWaterLevelStatus,
   createWaterDropletIcon
 }) => {
+  const map = useMap();
+  
+  const closePopup = () => {
+    if (map) {
+      map.closePopup();
+    }
+  };
+  
   if (!showMarkers || isLoading) return null;
 
   return (
@@ -41,17 +49,30 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
         const firstDevice = groupDevices[0];
         const deviceCount = groupDevices.length;
         
-        // Get the most critical status in the group (prioritize severity)
-        let mostCriticalColor = '#06b6d4';
+        // Get the most critical status in the group using exact status colors
+        let mostCriticalColor = '#06b6d4'; // Default cyan
+        let mostCriticalSeverityLevel = -1; // Start at -1 so even 'safe' (0) can be selected
+
+        const severityOrder = { 
+          safe: 0, 
+          low: 1, 
+          medium: 2, 
+          high: 3, 
+          veryhigh: 4, 
+          extreme: 5 
+        };
+
         groupDevices.forEach(device => {
           const rtData = deviceDataMap.get(device.device_id_unik);
           if (rtData) {
-            const status = getWaterLevelStatus(rtData.tmat_value);
-            if (status.severity === 'extreme') mostCriticalColor = '#EE0000';
-            else if (status.severity === 'veryhigh' && mostCriticalColor !== '#EE0000') mostCriticalColor = '#FFC000';
-            else if (status.severity === 'high' && !['#EE0000', '#FFC000'].includes(mostCriticalColor)) mostCriticalColor = '#FFFF00';
-            else if (status.severity === 'medium' && !['#EE0000', '#FFC000', '#FFFF00'].includes(mostCriticalColor)) mostCriticalColor = '#00B0F0';
-            else if (status.severity === 'low' && !['#EE0000', '#FFC000', '#FFFF00', '#00B0F0'].includes(mostCriticalColor)) mostCriticalColor = '#00B050';
+            const status = getWaterLevelStatus(rtData.tmat_value, isIndonesian);
+            const severityLevel = severityOrder[status.severity as keyof typeof severityOrder] || 0;
+            
+            // Update if this status is more critical than current (use exact color from status)
+            if (severityLevel > mostCriticalSeverityLevel) {
+              mostCriticalColor = status.color; // Use exact color from getWaterLevelStatus
+              mostCriticalSeverityLevel = severityLevel;
+            }
           }
         });
 
@@ -62,11 +83,22 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
             icon={createWaterDropletIcon(mostCriticalColor, deviceCount)}
           >
             {deviceCount > 1 ? (
-              <Popup maxWidth={320} minWidth={280}>
+              <Popup maxWidth={320} minWidth={280} closeButton={false}>
                 <div className="p-2">
-                  <h3 className="font-bold text-slate-800 text-sm mb-2">
-                    {isIndonesian ? 'Grup Perangkat' : 'Device Group'}
-                  </h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-slate-800 text-sm flex-1">
+                      {isIndonesian ? 'Grup Perangkat' : 'Device Group'}
+                    </h3>
+                    <button
+                      onClick={closePopup}
+                      className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors ml-2"
+                      title="Close"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-600 mb-3">
                     {firstDevice.kota}, {firstDevice.provinsi}
                   </p>
@@ -104,14 +136,27 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
                 </div>
               </Popup>
             ) : (
-              <Popup maxWidth={320} minWidth={280}>
+              <Popup maxWidth={320} minWidth={280} closeButton={false}>
                 <div className="p-3">
-                  <h3 className="font-bold text-slate-800 text-sm mb-1">
-                    {firstDevice.device_id_unik}
-                  </h3>
-                  <p className="text-xs text-slate-600 mb-3">
-                    {firstDevice.kota}, {firstDevice.provinsi}
-                  </p>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-800 text-sm">
+                        {firstDevice.device_id_unik}
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {firstDevice.kota}, {firstDevice.provinsi}
+                      </p>
+                    </div>
+                    <button
+                      onClick={closePopup}
+                      className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors ml-2"
+                      title="Close"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                   
                   <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
                     <div className="flex items-center justify-between">

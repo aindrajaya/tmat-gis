@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
-import { Polygon, Popup } from 'react-leaflet';
+import { Polygon, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { Device, RealtimeData } from '../../types';
 
 interface VoronoiPolygonData {
@@ -32,6 +33,14 @@ const VoronoiLayer: React.FC<VoronoiLayerProps> = memo(({
   onPolygonClick,
   isIndonesian 
 }) => {
+  const map = useMap();
+  
+  const closePopup = () => {
+    if (map) {
+      map.closePopup();
+    }
+  };
+  
   if (isLoading) return null;
 
   return (
@@ -55,9 +64,20 @@ const VoronoiLayer: React.FC<VoronoiLayerProps> = memo(({
               click: () => onPolygonClick(device)
             }}
           >
-            <Popup maxWidth={280} minWidth={240}>
+            <Popup maxWidth={280} minWidth={240} closeButton={false}>
               <div className="p-1">
-                <h3 className="font-bold text-slate-800 text-sm mb-2">{device.device_id_unik}</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-slate-800 text-sm flex-1">{device.device_id_unik}</h3>
+                  <button
+                    onClick={closePopup}
+                    className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors ml-2"
+                    title="Close"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
                 <p className="text-xs text-slate-600 mb-3">
                   {device.kota}, {device.provinsi}
                 </p>

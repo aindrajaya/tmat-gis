@@ -1,5 +1,7 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import store from './src/store';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -38,13 +40,14 @@ const LayoutContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <SidebarProvider>
-        <FilterProvider>
-          <Router>
-            <Routes>
-              {/* Public Route */}
-              <Route path="/login" element={<Login />} />
+    <Provider store={store}>
+      <AuthProvider>
+        <SidebarProvider>
+          <FilterProvider>
+            <Router>
+              <Routes>
+                {/* Public Route */}
+                <Route path="/login" element={<Login />} />
 
               {/* Public map-only view */}
               <Route path="/map" element={<FullMap />} />
@@ -70,6 +73,7 @@ const App: React.FC = () => {
         </FilterProvider>
       </SidebarProvider>
     </AuthProvider>
+    </Provider>
   );
 };
 

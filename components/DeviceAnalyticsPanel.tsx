@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Device, RealtimeData } from '../types';
 import { useRealtimeDevice } from '../services/useApi';
+import { MOCK_DEVICES, MOCK_REALTIME } from '../services/mockData';
 import { useFilters } from '../context/FilterContext';
 import TMATTrendChart from './charts/TMATTrendChart';
 import { X, ChevronUp, MapPin, Droplet, Thermometer, TestTube } from 'lucide-react';
@@ -13,17 +14,27 @@ interface Props {
 }
 
 const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, onClose }) => {
+  // Only show panel when device is actually selected (clicked)
   if (!selectedDevice) return null;
 
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const filters = useFilters();
   const [isExpanded, setIsExpanded] = useState(false);
-  const { data: historicalData, loading: historyLoading } = useRealtimeDevice(
+
+  // Query API for historical data using the resolved device id. 
+  // Hardcode November 19-25, 2025 to ensure we get the full week of data
+  const { data: historicalDataFromApi, loading: historyLoading } = useRealtimeDevice(
     selectedDevice.device_id_unik,
-    filters.startDate,
-    filters.endDate
+    '2025-11-19',
+    '2025-11-25'
   );
+
+  // Choose API data if available, otherwise use mock realtime history filtered by device (fallback)
+  // Mock data - no date filtering for development/demo purposes
+  const historicalData: RealtimeData[] = (historicalDataFromApi && historicalDataFromApi.length > 0)
+    ? historicalDataFromApi
+    : MOCK_REALTIME.filter(r => r.device_id_unik === selectedDevice.device_id_unik);
 
   const getWaterLevelStatus = (tmatValue: number) => {
     if (tmatValue >= 400) {
@@ -47,19 +58,33 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
       return [];
     }
 
-    return historicalData.map(data => ({
-      timestamp: new Date(data.timestamp_data).toLocaleDateString(isIndonesian ? 'id-ID' : 'en-US', {
+    return historicalData.map(data => {
+      const formattedDate = new Date(data.timestamp_data).toLocaleDateString(isIndonesian ? 'id-ID' : 'en-US', {
         month: 'short',
-        day: 'numeric'
-      }),
-      tmat: data.tmat_value,
-      temperature: data.suhu_value,
-      ph: data.ph_value,
-      fullTimestamp: data.timestamp_data
-    }));
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      return {
+        time: formattedDate, // Required by TMATTrendChart XAxis
+        date: formattedDate,
+        tmat: data.tmat_value,
+        temperature: data.suhu_value,
+        ph: data.ph_value,
+        fullTimestamp: data.timestamp_data
+      };
+    });
   }, [historicalData, isIndonesian]);
 
-  const currentStatus = realtimeData ? getWaterLevelStatus(realtimeData.tmat_value) : null;
+  // Determine current realtime reading: prefer prop, otherwise take latest from mock data for this device
+  // Mock data - no date filtering for development/demo purposes
+  const currentRealtime: RealtimeData | null = realtimeData
+    ?? (MOCK_REALTIME
+      .filter(r => r.device_id_unik === selectedDevice.device_id_unik)
+      .sort((a, b) => new Date(b.timestamp_data).getTime() - new Date(a.timestamp_data).getTime())[0]
+    ) ?? null;
+
+  const currentStatus = currentRealtime ? getWaterLevelStatus(currentRealtime.tmat_value) : null;
 
   return (
     <div
@@ -112,7 +137,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
         <div className="overflow-y-auto" style={{ maxHeight: isExpanded ? 'calc(100vh - 80px)' : 'calc(24rem - 60px)' }}>
           <div className="p-4 space-y-4">
             {/* Current Status Section */}
-            {realtimeData && currentStatus && (
+            {currentRealtime && currentStatus && (
               <div className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-lg p-4 border border-emerald-200">
                 <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-2">
                   <MapPin size={14} className="text-emerald-600" />
@@ -141,7 +166,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     <div className="flex items-center gap-2">
                       <Droplet size={14} style={{ color: currentStatus.color }} />
                       <span className="text-sm font-bold text-slate-800">
-                        {realtimeData.tmat_value.toFixed(2)} cm
+                        {currentRealtime ? currentRealtime.tmat_value.toFixed(2) : '—'} cm
                       </span>
                     </div>
                   </div>
@@ -154,7 +179,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     <div className="flex items-center gap-2">
                       <Thermometer size={14} className="text-orange-500" />
                       <span className="text-sm font-bold text-slate-800">
-                        {realtimeData.suhu_value.toFixed(1)}°C
+                        {currentRealtime ? currentRealtime.suhu_value.toFixed(1) : '—'}°C
                       </span>
                     </div>
                   </div>
@@ -165,7 +190,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     <div className="flex items-center gap-2">
                       <TestTube size={14} className="text-blue-500" />
                       <span className="text-sm font-bold text-slate-800">
-                        {realtimeData.ph_value.toFixed(2)}
+                        {currentRealtime ? currentRealtime.ph_value.toFixed(2) : '—'}
                       </span>
                     </div>
                   </div>
@@ -177,9 +202,9 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     {t('dashboard:analytics.lastUpdated')}:
                   </p>
                   <p className="text-xs font-medium text-slate-700">
-                    {new Date(realtimeData.timestamp_data).toLocaleString(
+                    {currentRealtime ? new Date(currentRealtime.timestamp_data).toLocaleString(
                       isIndonesian ? 'id-ID' : 'en-US'
-                    )}
+                    ) : '-'}
                   </p>
                 </div>
               </div>

@@ -60,6 +60,13 @@ const CityMarkerComponent: React.FC<{
     }, 100);
   }, [cityData, map, onCityClick]);
 
+  const closePopup = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (map) {
+      map.closePopup();
+    }
+  };
+
   return (
     <Marker
       key={`city-${cityKey}`}
@@ -97,12 +104,25 @@ const CityMarkerComponent: React.FC<{
         click: handleClick
       }}
     >
-      <Popup maxWidth={320} minWidth={280}>
+      <Popup maxWidth={320} minWidth={280} closeButton={false}>
         <div className="p-3">
-          <h3 className="font-bold text-slate-800 text-base mb-1">
-            {cityData.city}
-          </h3>
-          <p className="text-xs text-slate-500 mb-3">{cityData.provinsi}</p>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex-1">
+              <h3 className="font-bold text-slate-800 text-base">
+                {cityData.city}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">{cityData.provinsi}</p>
+            </div>
+            <button
+              onClick={closePopup}
+              className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors ml-2"
+              title="Close"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           
           <div className="mb-3">
             <p className="text-sm font-semibold text-slate-700 mb-2">

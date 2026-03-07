@@ -90,11 +90,17 @@ const Dashboard: React.FC = () => {
       let relevantData = realtimeData.filter(r => deviceIds.includes(r.device_id_unik));
 
       // If a city is selected, filter devices by that city first
+      let applicableDevices = filtered; // Track which devices to use for offline calculation
       if (filters.selectedCity) {
         const cityDevices = filtered.filter(d => d.kota === filters.selectedCity);
+        applicableDevices = cityDevices;
         const cityDeviceIds = cityDevices.map(d => d.device_id_unik);
         relevantData = relevantData.filter(r => cityDeviceIds.includes(r.device_id_unik));
       }
+
+      // Only count aktif devices
+      const aktifDevices = applicableDevices.filter(d => d.status === 'aktif');
+      const aktifDeviceIds = aktifDevices.map(d => d.device_id_unik);
 
       // Apply date filters if set
       if (filters.startDate || filters.endDate) {
@@ -107,12 +113,12 @@ const Dashboard: React.FC = () => {
       }
 
       // DAILY AGGREGATION
-      const dailyAggregation: { [date: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number } } = {};
+      const dailyAggregation: { [date: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
       
       relevantData.forEach(r => {
         const date = r.timestamp_data.split(' ')[0]; // Extract date
         if (!dailyAggregation[date]) {
-          dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
+          dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
         }
         
         // Determine condition based on TMAT value (6-level classification)
@@ -132,6 +138,17 @@ const Dashboard: React.FC = () => {
         }
       });
 
+      // Add offline devices count for each day
+      Object.keys(dailyAggregation).forEach(date => {
+        const devicesWithDataOnDate = new Set(
+          relevantData
+            .filter(r => r.timestamp_data.split(' ')[0] === date)
+            .map(r => r.device_id_unik)
+        );
+        // Offline = aktif devices - devices that reported on this day
+        dailyAggregation[date].offline = aktifDeviceIds.length - devicesWithDataOnDate.size;
+      });
+
       // Convert to chart format and sort by date
       const dailyChartArray = Object.entries(dailyAggregation)
         .map(([date, counts]) => ({ date, ...counts }))
@@ -140,13 +157,13 @@ const Dashboard: React.FC = () => {
       setChartData(dailyChartArray.length > 0 ? dailyChartArray : []);
 
       // WEEKLY AGGREGATION
-      const weeklyAggregation: { [weekStart: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number } } = {};
+      const weeklyAggregation: { [weekStart: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
       
       relevantData.forEach(r => {
         const date = r.timestamp_data.split(' ')[0];
         const weekStart = getWeekStart(date);
         if (!weeklyAggregation[weekStart]) {
-          weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
+          weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
         }
         
         if (r.tmat_value < -0.6) {
@@ -164,6 +181,17 @@ const Dashboard: React.FC = () => {
         }
       });
 
+      // Add offline devices count for each week
+      Object.keys(weeklyAggregation).forEach(weekStart => {
+        const devicesWithDataInWeek = new Set(
+          relevantData
+            .filter(r => getWeekStart(r.timestamp_data.split(' ')[0]) === weekStart)
+            .map(r => r.device_id_unik)
+        );
+        // Offline = aktif devices - devices that reported in this week
+        weeklyAggregation[weekStart].offline = aktifDeviceIds.length - devicesWithDataInWeek.size;
+      });
+      
       // Convert to chart format with week labels
       const weeklyChartArray = Object.entries(weeklyAggregation)
         .map(([weekStart, counts]) => ({ 

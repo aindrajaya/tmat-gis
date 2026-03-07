@@ -13,7 +13,7 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
   // Convert counts to percentages
   const percentageData = useMemo(() => {
     return data.map(item => {
-      const total = (item.safe || 0) + (item.low || 0) + (item.medium || 0) + (item.high || 0) + (item.veryhigh || 0) + (item.extreme || 0);
+      const total = (item.safe || 0) + (item.low || 0) + (item.medium || 0) + (item.high || 0) + (item.veryhigh || 0) + (item.extreme || 0) + (item.offline || 0);
       if (total === 0) {
         return {
           ...item,
@@ -23,6 +23,7 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
           high: 0,
           veryhigh: 0,
           extreme: 0,
+          offline: 0,
         };
       }
       return {
@@ -33,6 +34,7 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
         high: Math.round((item.high || 0) / total * 100),
         veryhigh: Math.round((item.veryhigh || 0) / total * 100),
         extreme: Math.round((item.extreme || 0) / total * 100),
+        offline: Math.round((item.offline || 0) / total * 100),
       };
     });
   }, [data]);
@@ -43,7 +45,7 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
       return (
         <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
           <p className="text-sm font-semibold text-slate-700 mb-2">{payload[0].payload.date}</p>
-          {payload.reverse().map((entry: any, index: number) => (
+          {payload.map((entry: any, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
               {entry.name}: {entry.value}%
             </p>
@@ -76,12 +78,13 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
           <YAxis fontSize={12} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
           <RechartsTooltip content={<CustomTooltip />} />
           <Legend />
-          <Bar dataKey="safe" stackId="a" fill="#703CA0" name="Tidak Beresiko" />
-          <Bar dataKey="low" stackId="a" fill="#00B050" name="Rendah" />
-          <Bar dataKey="medium" stackId="a" fill="#00B0F0" name="Sedang" />
-          <Bar dataKey="high" stackId="a" fill="#FFFF00" name="Tinggi" />
-          <Bar dataKey="veryhigh" stackId="a" fill="#FFC000" name="Sangat Tinggi" />
+          <Bar dataKey="offline" stackId="a" fill="#9CA3AF" name="Offline" />
           <Bar dataKey="extreme" stackId="a" fill="#EE0000" name="Ekstrim" />
+          <Bar dataKey="veryhigh" stackId="a" fill="#FFC000" name="Sangat Tinggi" />
+          <Bar dataKey="high" stackId="a" fill="#FFFF00" name="Tinggi" />
+          <Bar dataKey="medium" stackId="a" fill="#00B0F0" name="Sedang" />
+          <Bar dataKey="low" stackId="a" fill="#00B050" name="Rendah" />
+          <Bar dataKey="safe" stackId="a" fill="#703CA0" name="Tidak Beresiko" />
         </BarChart>
       </ResponsiveContainer>
     </div>

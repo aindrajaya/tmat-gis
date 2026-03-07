@@ -11,6 +11,7 @@ import { Device, RealtimeData } from '../types';
 import { useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
+import { getWaterLevelStatus, getOfflineStatus } from '../utils/waterLevelStatus';
 import AdvancedFilterPanel from './AdvancedFilterPanel';
 import DeviceAnalyticsPanel from './DeviceAnalyticsPanel';
 import VoronoiLayer from './map/VoronoiLayer';
@@ -97,60 +98,6 @@ const createWaterDropletIcon = (color: string = '#3b82f6', count?: number) => {
     iconAnchor: [16, 40],
     popupAnchor: [0, -40],
   });
-};
-
-// Water level status classification based on TMAT values
-// TMAT value indicates water level depth (negative = below surface)
-const getWaterLevelStatus = (tmatValue: number) => {
-  if (tmatValue >= 0) {
-    return { 
-      level: 'Tidak Beresiko', 
-      color: '#703CA0', 
-      range: '0 cm',
-      description: 'No risk - Safe',
-      severity: 'safe'
-    };
-  } else if (tmatValue >= -0.2) {
-    return { 
-      level: 'Rendah', 
-      color: '#00B050', 
-      range: '0 - 20 cm',
-      description: 'Low water level - Safe',
-      severity: 'low'
-    };
-  } else if (tmatValue >= -0.4) {
-    return { 
-      level: 'Sedang', 
-      color: '#00B0F0', 
-      range: '20 - 40 cm',
-      description: 'Moderate water level - Warning',
-      severity: 'medium'
-    };
-  } else if (tmatValue >= -0.6) {
-    return { 
-      level: 'Tinggi', 
-      color: '#FFFF00', 
-      range: '40 - 60 cm',
-      description: 'High water level - Danger',
-      severity: 'high'
-    };
-  } else if (tmatValue >= -0.8) {
-    return { 
-      level: 'Sangat Tinggi', 
-      color: '#FFC000', 
-      range: '60 - 80 cm',
-      description: 'Very high water level - Emergency',
-      severity: 'veryhigh'
-    };
-  } else {
-    return { 
-      level: 'Ekstrim', 
-      color: '#EE0000', 
-      range: '> 80 cm',
-      description: 'Extreme water level - Critical',
-      severity: 'extreme'
-    };
-  }
 };
 
 interface Props {
@@ -723,14 +670,8 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       
       // Handle offline devices
       const status = rtData 
-        ? getWaterLevelStatus(rtData.tmat_value)
-        : {
-            level: isIndonesian ? 'Offline' : 'Offline',
-            color: '#94a3b8',
-            range: 'N/A',
-            description: 'Device offline',
-            severity: 'offline'
-          };
+        ? getWaterLevelStatus(rtData.tmat_value, isIndonesian)
+        : getOfflineStatus(isIndonesian);
       
       // Clip polygon to reasonable size (max 0.005 degrees from device center)
       const maxRadius = 0.01; //this radius in degrees (~1.11 km in real world)
@@ -860,7 +801,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
           cityData.stats.offline++;
           return;
         }
-        const status = getWaterLevelStatus(rtData.tmat_value);
+        const status = getWaterLevelStatus(rtData.tmat_value, isIndonesian);
         cityData.stats[status.severity as keyof typeof cityData.stats]++;
       });
     });
@@ -886,7 +827,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         statusCounts.offline++;
         return;
       }
-      const status = getWaterLevelStatus(rtData.tmat_value);
+      const status = getWaterLevelStatus(rtData.tmat_value, isIndonesian);
       statusCounts[status.severity as keyof typeof statusCounts]++;
     });
 

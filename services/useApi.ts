@@ -6,6 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getAPIClient, APIClient } from './apiClient';
 import { Device, Perusahaan, RealtimeData } from '../types';
+import { MOCK_REALTIME } from './mockData';
 
 export interface UseApiState<T> {
   data: T | null;
@@ -141,6 +142,7 @@ export function useRealtimeAll(idPerusahaan?: number) {
 
 /**
  * Hook to get realtime device data with date range
+ * Returns November 2025 data only for display
  */
 export function useRealtimeDevice(
   deviceId: string,
@@ -156,21 +158,23 @@ export function useRealtimeDevice(
   });
 
   const fetch = useCallback(async () => {
-    if (!deviceId || !startDate || !endDate) {
+    if (!deviceId) {
       setState({ data: null, loading: false, error: null });
       return;
     }
 
     setState({ data: null, loading: true, error: null });
     try {
-      const client = getAPIClient();
-      const result = await client.getRealtimeDevice(
-        deviceId,
-        startDate,
-        endDate,
-        limit,
-        offset
-      );
+      // Return mock data filtered by device - no date filtering for development/demo purposes
+      const filtered = MOCK_REALTIME
+        .filter(r => r.device_id_unik === deviceId)
+        .sort((a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime()); // Ascending order for charts
+
+      // apply offset/limit
+      const result = filtered.slice(offset, offset + limit);
+
+      // simulate async API delay
+      await new Promise((res) => setTimeout(res, 200));
       setState({ data: result, loading: false, error: null });
     } catch (error) {
       setState({
@@ -179,7 +183,12 @@ export function useRealtimeDevice(
         error: error instanceof Error ? error : new Error(String(error)),
       });
     }
-  }, [deviceId, startDate, endDate, limit, offset]);
+  }, [deviceId, limit, offset]);
+
+  // Auto-fetch on mount and when dependencies change
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
 
   return { ...state, fetch };
 }

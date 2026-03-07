@@ -45,6 +45,7 @@ const StatusTrendChart = forwardRef<HTMLDivElement, StatusTrendChartProps>(({ da
           <YAxis fontSize={12} />
           <RechartsTooltip content={<CustomTooltip />} />
           <Legend />
+          <Line type="monotone" dataKey="offline" stroke="#9CA3AF" strokeWidth={2} dot={false} name="Offline" />
           <Line type="monotone" dataKey="safe" stroke="#703CA0" strokeWidth={2} dot={false} name="Tidak Beresiko" />
           <Line type="monotone" dataKey="low" stroke="#00B050" strokeWidth={2} dot={false} name="Rendah" />
           <Line type="monotone" dataKey="medium" stroke="#00B0F0" strokeWidth={2} dot={false} name="Sedang" />

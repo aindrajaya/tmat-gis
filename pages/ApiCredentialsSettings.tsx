@@ -11,7 +11,14 @@ import {
 import { loadRuntimeApiKeys } from '../services/runtimeApiKeys';
 
 const ApiCredentialsSettings: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updatePerusahaanScope } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const isPerusahaanUser = user?.role === 'perusahaan';
+  const scopedPerusahaanIdRaw = user?.perusahaanId;
+  const scopedPerusahaanId = (() => {
+    const parsed = Number(scopedPerusahaanIdRaw);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  })();
   const [adminApiKey, setAdminApiKey] = useState('');
   const [perusahaanId, setPerusahaanId] = useState('');
   const [perusahaanKey, setPerusahaanKey] = useState('');
@@ -19,7 +26,7 @@ const ApiCredentialsSettings: React.FC = () => {
   const [error, setError] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
 
-  if (user?.role !== 'admin') {
+  if (!isAdmin && !isPerusahaanUser) {
     return <Navigate to="/" replace />;
   }
 
@@ -36,6 +43,18 @@ const ApiCredentialsSettings: React.FC = () => {
     setAdminApiKey(runtime.adminApiKey || '');
   }, [runtime.adminApiKey]);
 
+  useEffect(() => {
+    if (isPerusahaanUser && scopedPerusahaanId) {
+      setPerusahaanId(String(scopedPerusahaanId));
+      setPerusahaanKey(runtime.perusahaanApiKeys[String(scopedPerusahaanId)] || '');
+      return;
+    }
+    if (isPerusahaanUser && !scopedPerusahaanId) {
+      setPerusahaanId('');
+      setPerusahaanKey('');
+    }
+  }, [isPerusahaanUser, scopedPerusahaanId, runtime.perusahaanApiKeys]);
+
   const maskApiKey = (key: string) => {
     if (!key) return '-';
     if (key.length <= 8) return '*'.repeat(key.length);
@@ -43,6 +62,7 @@ const ApiCredentialsSettings: React.FC = () => {
   };
 
   const saveAdminKey = () => {
+    if (!isAdmin) return;
     setStatus('');
     setError('');
     const value = adminApiKey.trim();
@@ -58,6 +78,7 @@ const ApiCredentialsSettings: React.FC = () => {
   const savePerusahaanKey = () => {
     setStatus('');
     setError('');
+
     const id = Number(perusahaanId);
     const key = perusahaanKey.trim();
 
@@ -70,14 +91,20 @@ const ApiCredentialsSettings: React.FC = () => {
       return;
     }
 
+    if (isPerusahaanUser) {
+      updatePerusahaanScope(id);
+    }
     setUserPerusahaanApiKey(id, key);
-    setPerusahaanId('');
-    setPerusahaanKey('');
+    if (!isPerusahaanUser) {
+      setPerusahaanId('');
+      setPerusahaanKey('');
+    }
     setStatus(`API key perusahaan #${id} berhasil disimpan.`);
     setRefreshToken((v) => v + 1);
   };
 
   const deletePerusahaanKey = (id: string) => {
+    if (!isAdmin) return;
     setStatus('');
     setError('');
     removeUserPerusahaanApiKey(Number(id));
@@ -86,6 +113,7 @@ const ApiCredentialsSettings: React.FC = () => {
   };
 
   const clearAllKeys = () => {
+    if (!isAdmin) return;
     setStatus('');
     setError('');
     clearUserApiKeys();
@@ -98,33 +126,37 @@ const ApiCredentialsSettings: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold text-slate-800">API Credentials</h1>
         <p className="text-sm text-slate-600 mt-1">
-          Konfigurasi API key runtime untuk akses endpoint production.
+          {isAdmin
+            ? 'Konfigurasi API key runtime untuk akses endpoint production.'
+            : 'Masukkan API key perusahaan Anda. Data aplikasi akan dibatasi ke perusahaan ini.'}
         </p>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Admin API Key
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={adminApiKey}
-              onChange={(e) => setAdminApiKey(e.target.value)}
-              placeholder="Masukkan admin API key"
-              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-            <button
-              type="button"
-              onClick={saveAdminKey}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700"
-            >
-              <Save size={16} />
-              Simpan
-            </button>
+        {isAdmin && (
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Admin API Key
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={adminApiKey}
+                onChange={(e) => setAdminApiKey(e.target.value)}
+                placeholder="Masukkan admin API key"
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={saveAdminKey}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700"
+              >
+                <Save size={16} />
+                Simpan
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="pt-2 border-t border-slate-100">
           <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -151,12 +183,17 @@ const ApiCredentialsSettings: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
             >
               <Plus size={16} />
-              Add/Update
+              {isPerusahaanUser ? 'Simpan Key Saya' : 'Add/Update'}
             </button>
           </div>
+          {isPerusahaanUser && (
+            <p className="text-xs text-slate-500 mt-2">
+              Isi ID perusahaan sesuai akun Anda, lalu simpan API key perusahaan.
+            </p>
+          )}
         </div>
 
-        {perusahaanEntries.length > 0 && (
+        {isAdmin && perusahaanEntries.length > 0 && (
           <div className="pt-2 border-t border-slate-100 space-y-2">
             <p className="text-sm font-semibold text-slate-700">Daftar Key Perusahaan</p>
             {perusahaanEntries.map((entry) => (
@@ -185,13 +222,15 @@ const ApiCredentialsSettings: React.FC = () => {
             {status && <p className="text-sm text-emerald-700 font-medium">{status}</p>}
             {error && <p className="text-sm text-red-700 font-medium">{error}</p>}
           </div>
-          <button
-            type="button"
-            onClick={clearAllKeys}
-            className="text-sm font-medium text-slate-600 hover:text-slate-800"
-          >
-            Reset semua key
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={clearAllKeys}
+              className="text-sm font-medium text-slate-600 hover:text-slate-800"
+            >
+              Reset semua key
+            </button>
+          )}
         </div>
       </div>
     </div>

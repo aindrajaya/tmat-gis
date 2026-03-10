@@ -12,7 +12,7 @@ const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const showMapNav = !user?.provinsi;
+  const showMapNav = user?.role === 'admin';
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -72,15 +72,25 @@ const Sidebar: React.FC = () => {
         {showMapNav && <NavItem to="/map" icon={MapIcon} label={t('common:nav.map')} />}
         <NavItem to="/raw-data" icon={FileText} label={t('common:nav.rawData')} />
 
-        {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-6">{t('common:nav.management')}</div>}
-        <NavItem to="/master/device" icon={Database} label={t('common:nav.deviceLogger')} />
-        <NavItem to="/master/company" icon={Database} label={t('common:nav.companyData')} />
-        
         {user?.role === 'admin' && (
+          <>
+            {!isCollapsed && (
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-6">
+                {t('common:nav.management')}
+              </div>
+            )}
+            <NavItem to="/master/device" icon={Database} label={t('common:nav.deviceLogger')} />
+            <NavItem to="/master/company" icon={Database} label={t('common:nav.companyData')} />
+          </>
+        )}
+        
+        {(user?.role === 'admin' || user?.role === 'perusahaan') && (
           <>
             {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-6">{t('common:nav.admin')}</div>}
             <NavItem to="/settings/api-credentials" icon={Key} label={t('common:nav.apiManagement')} />
-            <NavItem to="/users" icon={Users} label={t('common:nav.userRoles')} />
+            {user?.role === 'admin' && (
+              <NavItem to="/users" icon={Users} label={t('common:nav.userRoles')} />
+            )}
           </>
         )}
       </nav>

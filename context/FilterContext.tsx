@@ -46,23 +46,26 @@ const getDateRange = (period: string): { startDate: string; endDate: string } =>
   return { startDate, endDate };
 };
 
-const defaultFilters: FilterState = {
-  provinsi: '',
-  kabupaten: '',
-  kecamatan: '',
-  desa: '',
-  jenis_perusahaan: '',
-  startDate: '2025-11-01',
-  endDate: '2025-11-25',
-  timePeriod: 'custom',
-  searchText: '',
-  selectedCity: null
+const buildDefaultFilters = (): FilterState => {
+  const { startDate, endDate } = getDateRange('7d');
+  return {
+    provinsi: '',
+    kabupaten: '',
+    kecamatan: '',
+    desa: '',
+    jenis_perusahaan: '',
+    startDate,
+    endDate,
+    timePeriod: '7d',
+    searchText: '',
+    selectedCity: null,
+  };
 };
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
+  const [filters, setFilters] = useState<FilterState>(buildDefaultFilters());
   const [apiMode, setApiMode] = useState<'dev' | 'prod'>(
     (import.meta.env.VITE_API_MODE as 'dev' | 'prod') || 'dev'
   );
@@ -89,10 +92,13 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setFilters(prev => ({ ...prev, selectedCity: cityName }));
   };
 
-  const resetFilters = () => setFilters({
-    ...defaultFilters,
-    provinsi: enforcedProvinsi || '',
-  });
+  const resetFilters = () => {
+    const defaults = buildDefaultFilters();
+    setFilters({
+      ...defaults,
+      provinsi: enforcedProvinsi || '',
+    });
+  };
 
   // Enforce province filter when user has province restriction
   useEffect(() => {

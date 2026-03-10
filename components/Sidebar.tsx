@@ -76,9 +76,13 @@ const Sidebar: React.FC = () => {
         <NavItem to="/master/device" icon={Database} label={t('common:nav.deviceLogger')} />
         <NavItem to="/master/company" icon={Database} label={t('common:nav.companyData')} />
         
-        {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-6">{t('common:nav.admin')}</div>}
-        <NavItem to="/api-keys" icon={Key} label={t('common:nav.apiManagement')} />
-        <NavItem to="/users" icon={Users} label={t('common:nav.userRoles')} />
+        {user?.role === 'admin' && (
+          <>
+            {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-6">{t('common:nav.admin')}</div>}
+            <NavItem to="/settings/api-credentials" icon={Key} label={t('common:nav.apiManagement')} />
+            <NavItem to="/users" icon={Users} label={t('common:nav.userRoles')} />
+          </>
+        )}
       </nav>
 
       <div className="p-4 border-t border-slate-100 space-y-3">

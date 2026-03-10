@@ -188,7 +188,7 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
                             {isIndonesian ? 'Waktu Update' : 'Last Update'}
                           </span>
                           <span className="text-xs font-bold text-slate-800">
-                            {new Date(deviceDataMap.get(firstDevice.device_id_unik)?.timestamp || '').toLocaleTimeString()}
+                            {new Date(deviceDataMap.get(firstDevice.device_id_unik)?.timestamp_data || '').toLocaleTimeString()}
                           </span>
                         </div>
                         

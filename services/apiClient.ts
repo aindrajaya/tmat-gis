@@ -206,7 +206,9 @@ export class APIClient {
     const coordinates = this.resolveCoordinates(raw);
     const normalizedDeviceId = String(
       this.pickFirstValue(raw, ['device_id_unik', 'device_id', 'kode_device']) || ''
-    ).trim();
+    )
+      .trim()
+      .toUpperCase();
     const provinsiId = String(this.pickFirstValue(raw, ['provinsi_id']) || '').trim();
     const kabupatenId = String(this.pickFirstValue(raw, ['kabupaten_id']) || '').trim();
     const kecamatanId = String(this.pickFirstValue(raw, ['kecamatan_id']) || '').trim();
@@ -256,7 +258,9 @@ export class APIClient {
     const raw = (row || {}) as Record<string, unknown>;
     const normalizedDeviceId = String(
       this.pickFirstValue(raw, ['device_id_unik', 'device_id', 'kode_device']) || ''
-    ).trim();
+    )
+      .trim()
+      .toUpperCase();
     const timestampSource = this.pickFirstValue(raw, [
       'timestamp_data',
       'timestamp',

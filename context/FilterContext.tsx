@@ -14,10 +14,17 @@ interface FilterContextType {
   updateSelectedCity: (cityName: string | null) => void;
 }
 
+const toLocalDateInputValue = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const getDateRange = (period: string): { startDate: string; endDate: string } => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const endDate = today.toISOString().split('T')[0];
+  const endDate = toLocalDateInputValue(today);
   let startDate = endDate;
 
   switch (period) {
@@ -27,17 +34,17 @@ const getDateRange = (period: string): { startDate: string; endDate: string } =>
     case '7d':
       const date7d = new Date(today);
       date7d.setDate(date7d.getDate() - 6);
-      startDate = date7d.toISOString().split('T')[0];
+      startDate = toLocalDateInputValue(date7d);
       break;
     case '14d':
       const date14d = new Date(today);
       date14d.setDate(date14d.getDate() - 13);
-      startDate = date14d.toISOString().split('T')[0];
+      startDate = toLocalDateInputValue(date14d);
       break;
     case '30d':
       const date30d = new Date(today);
       date30d.setDate(date30d.getDate() - 29);
-      startDate = date30d.toISOString().split('T')[0];
+      startDate = toLocalDateInputValue(date30d);
       break;
     default:
       break;

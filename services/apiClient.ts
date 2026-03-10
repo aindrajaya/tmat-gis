@@ -41,12 +41,59 @@ export class APIClient {
     };
   }
 
+  private getAuthSnapshot():
+    | { role?: string; perusahaanId?: number | null }
+    | null {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return null;
+    }
+
+    try {
+      const raw = localStorage.getItem('tmat_auth');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.user || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private getAuthenticatedPerusahaanScope(): number | undefined {
+    const auth = this.getAuthSnapshot();
+    if (!auth || auth.role !== 'perusahaan') return undefined;
+    const id = Number(auth.perusahaanId);
+    return Number.isInteger(id) && id > 0 ? id : undefined;
+  }
+
+  private isPerusahaanSession(): boolean {
+    const auth = this.getAuthSnapshot();
+    return !!auth && auth.role === 'perusahaan';
+  }
+
+  private resolvePerusahaanScope(requestedId?: number): number | undefined {
+    const authScope = this.getAuthenticatedPerusahaanScope();
+    if (authScope) {
+      if (requestedId && requestedId !== authScope) {
+        console.warn(
+          `${this.debugPrefix}[scope] overriding requested perusahaanId=${requestedId} with auth scope perusahaanId=${authScope}`
+        );
+      }
+      return authScope;
+    }
+    return requestedId;
+  }
+
   private getApiKeyForScope(perusahaanId?: number): string {
+    const authScope = this.getAuthenticatedPerusahaanScope();
+
+    // Company users must use their own perusahaan key and may not fallback to admin key.
+    if (this.isPerusahaanSession()) {
+      if (!authScope) return '';
+      return this.config.perusahaanApiKeys[String(authScope)] || '';
+    }
+
     if (!perusahaanId) return this.config.adminApiKey;
-    return (
-      this.config.perusahaanApiKeys[String(perusahaanId)] ||
-      this.config.adminApiKey
-    );
+    return this.config.perusahaanApiKeys[String(perusahaanId)] || this.config.adminApiKey;
   }
 
   /**
@@ -57,8 +104,9 @@ export class APIClient {
     options?: RequestInit,
     perusahaanId?: number
   ): Promise<T> {
+    const scopedPerusahaanId = this.resolvePerusahaanScope(perusahaanId);
     const url = `${this.config.baseUrl}${endpoint}`;
-    const apiKey = this.getApiKeyForScope(perusahaanId);
+    const apiKey = this.getApiKeyForScope(scopedPerusahaanId);
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -67,7 +115,7 @@ export class APIClient {
     };
 
     console.log(`[API] Requesting: ${url}`, {
-      perusahaanId: perusahaanId || 'GLOBAL',
+      perusahaanId: scopedPerusahaanId || 'GLOBAL',
       apiKey: apiKey ? `***${apiKey.slice(-4)}` : 'MISSING',
       headers,
     });
@@ -349,6 +397,11 @@ export class APIClient {
   private async aggregateByPerusahaan<T>(
     fetcher: (perusahaanId: number) => Promise<T[]>
   ): Promise<T[]> {
+    const scoped = this.getAuthenticatedPerusahaanScope();
+    if (scoped) {
+      return fetcher(scoped);
+    }
+
     const companies = await this.getPerusahaan();
     const ids = companies.map((company) => company.id).filter(Boolean);
 
@@ -375,25 +428,26 @@ export class APIClient {
    * GET /perusahaan - Get all companies or single company by ID
    */
   async getPerusahaan(id?: number): Promise<Perusahaan[]> {
-    this.logMethod('getPerusahaan', `start id=${id ?? 'ALL'}`);
-    if (id) {
+    const scopedId = this.resolvePerusahaanScope(id);
+    this.logMethod('getPerusahaan', `start id=${scopedId ?? 'ALL'}`);
+    if (scopedId) {
       try {
-        const bySegment = await this.request<any>(`/perusahaan/${id}`);
+        const bySegment = await this.request<any>(`/perusahaan/${scopedId}`, undefined, scopedId);
         const normalized = this.normalizePerusahaanResponse(bySegment);
         if (normalized.length > 0) return normalized;
       } catch {
         // Fallback to legacy query style below.
       }
 
-      const byQuery = await this.request<any>(`/perusahaan?id=${id}`);
+      const byQuery = await this.request<any>(`/perusahaan?id=${scopedId}`, undefined, scopedId);
       const normalized = this.normalizePerusahaanResponse(byQuery);
-      return normalized.filter((company) => company.id === id);
+      return normalized.filter((company) => company.id === scopedId);
     }
 
     const companies = await this.request<any>('/perusahaan');
     const normalized = this.normalizePerusahaanResponse(companies);
     this.logMethod('getPerusahaan', 'success', {
-      id: id ?? 'ALL',
+      id: scopedId ?? 'ALL',
       count: normalized.length,
     });
     return normalized;
@@ -415,10 +469,15 @@ export class APIClient {
    * Get devices grouped by perusahaan
    */
   async getPerusahaanDevices(perusahaanId?: number): Promise<PerusahaanWithDevices[]> {
+    const scopedPerusahaanId = this.resolvePerusahaanScope(perusahaanId);
     // Prefer legacy endpoint if available for efficiency.
     try {
-      const query = perusahaanId ? `?id=${perusahaanId}` : '';
-      const response = await this.request<any>(`/perusahaan/devices${query}`, undefined, perusahaanId);
+      const query = scopedPerusahaanId ? `?id=${scopedPerusahaanId}` : '';
+      const response = await this.request<any>(
+        `/perusahaan/devices${query}`,
+        undefined,
+        scopedPerusahaanId
+      );
       const normalized = this.normalizePerusahaanDevicesResponse(response);
       if (normalized.length > 0) {
         return normalized;
@@ -427,7 +486,7 @@ export class APIClient {
       // Fallback to composition from /perusahaan + /device.
     }
 
-    const companies = await this.getPerusahaan(perusahaanId);
+    const companies = await this.getPerusahaan(scopedPerusahaanId);
     const settled = await Promise.allSettled(
       companies.map(async (company) => {
         const devices = await this.getDevice(undefined, company.id);
@@ -447,19 +506,20 @@ export class APIClient {
    * GET /device - Get devices (optionally scoped by perusahaan)
    */
   async getDevice(deviceId?: string, perusahaanId?: number): Promise<Device[]> {
+    const scopedPerusahaanId = this.resolvePerusahaanScope(perusahaanId);
     this.logMethod('getDevice', 'start', {
       deviceId: deviceId || 'ALL',
-      perusahaanId: perusahaanId ?? 'GLOBAL',
-      expectedEndpoint: perusahaanId
-        ? `/device?id_perusahaan=${perusahaanId}`
+      perusahaanId: scopedPerusahaanId ?? 'GLOBAL',
+      expectedEndpoint: scopedPerusahaanId
+        ? `/device?id_perusahaan=${scopedPerusahaanId}`
         : '/device (or aggregated /device?id_perusahaan=...)',
     });
     // Primary path for new production API: /device?id_perusahaan={id}
-    if (perusahaanId) {
+    if (scopedPerusahaanId) {
       const response = await this.request<any>(
-        `/device?id_perusahaan=${perusahaanId}`,
+        `/device?id_perusahaan=${scopedPerusahaanId}`,
         undefined,
-        perusahaanId
+        scopedPerusahaanId
       );
 
       const devices = this.normalizeArrayResponse<Device>(response);
@@ -469,8 +529,8 @@ export class APIClient {
       const validCoords = normalizedDevices.filter(
         (d) => Number.isFinite(d.latitude) && Number.isFinite(d.longitude) && (d.latitude !== 0 || d.longitude !== 0)
       ).length;
-      this.logMethod('getDevice', 'success scoped', {
-        perusahaanId,
+        this.logMethod('getDevice', 'success scoped', {
+        perusahaanId: scopedPerusahaanId,
         totalDevices: normalizedDevices.length,
         validCoordinateDevices: validCoords,
         sample: normalizedDevices.slice(0, 3).map((d) => ({
@@ -554,23 +614,24 @@ export class APIClient {
    * GET /realtime_all - Get realtime data summary for all devices
    */
   async getRealtimeAll(idPerusahaan?: number): Promise<RealtimeData[]> {
+    const scopedPerusahaanId = this.resolvePerusahaanScope(idPerusahaan);
     this.logMethod('getRealtimeAll', 'start', {
-      perusahaanId: idPerusahaan ?? 'GLOBAL',
-      expectedEndpoint: idPerusahaan
-        ? `/realtime_all?id_perusahaan=${idPerusahaan}`
+      perusahaanId: scopedPerusahaanId ?? 'GLOBAL',
+      expectedEndpoint: scopedPerusahaanId
+        ? `/realtime_all?id_perusahaan=${scopedPerusahaanId}`
         : '/realtime_all (or aggregated /realtime_all?id_perusahaan=...)',
     });
-    if (idPerusahaan) {
+    if (scopedPerusahaanId) {
       const scoped = await this.request<any>(
-        `/realtime_all?id_perusahaan=${idPerusahaan}`,
+        `/realtime_all?id_perusahaan=${scopedPerusahaanId}`,
         undefined,
-        idPerusahaan
+        scopedPerusahaanId
       );
       const normalized = this.normalizeArrayResponse<RealtimeData>(scoped).map((item) =>
         this.normalizeRealtimeRecord(item)
       );
-      this.logMethod('getRealtimeAll', 'success scoped', {
-        perusahaanId: idPerusahaan,
+        this.logMethod('getRealtimeAll', 'success scoped', {
+        perusahaanId: scopedPerusahaanId,
         totalRows: normalized.length,
         sample: normalized.slice(0, 3).map((r) => ({
           device_id_unik: r.device_id_unik,
@@ -631,16 +692,22 @@ export class APIClient {
     offset: number = 0,
     perusahaanId?: number
   ): Promise<RealtimeData[]> {
+    const scopedPerusahaanId = this.resolvePerusahaanScope(perusahaanId);
     const params = {
       device_id: deviceId,
       start_date: startDate,
       end_date: endDate,
       limit,
       offset,
+      ...(scopedPerusahaanId ? { id_perusahaan: scopedPerusahaanId } : {}),
     };
 
     const query = this.buildQueryString(params);
-    const response = await this.request<any>(`/realtime_device?${query}`, undefined, perusahaanId);
+    const response = await this.request<any>(
+      `/realtime_device?${query}`,
+      undefined,
+      scopedPerusahaanId
+    );
 
     if (Array.isArray(response)) {
       return response.map((item) => this.normalizeRealtimeRecord(item));
@@ -667,16 +734,22 @@ export class APIClient {
     offset: number = 0,
     perusahaanId?: number
   ): Promise<PaginatedResponse<RealtimeData>> {
+    const scopedPerusahaanId = this.resolvePerusahaanScope(perusahaanId);
     const params = {
       device_id: deviceId,
       start_date: startDate,
       end_date: endDate,
       limit,
       offset,
+      ...(scopedPerusahaanId ? { id_perusahaan: scopedPerusahaanId } : {}),
     };
 
     const query = this.buildQueryString(params);
-    const response = await this.request<any>(`/realtime_device?${query}`, undefined, perusahaanId);
+    const response = await this.request<any>(
+      `/realtime_device?${query}`,
+      undefined,
+      scopedPerusahaanId
+    );
 
     if (Array.isArray(response)) {
       return {

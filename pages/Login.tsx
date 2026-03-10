@@ -134,7 +134,7 @@ const Login: React.FC = () => {
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
-                {isIndonesian ? 'Email' : 'Email Address'}
+                {isIndonesian ? 'Email / Username' : 'Email / Username'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -142,11 +142,11 @@ const Login: React.FC = () => {
                 </div>
                 <input
                   id="email"
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                  placeholder={isIndonesian ? 'Masukkan email Anda' : 'Enter your email'}
+                  placeholder={isIndonesian ? 'Masukkan email atau username' : 'Enter email or username'}
                   required
                 />
               </div>
@@ -266,6 +266,25 @@ const Login: React.FC = () => {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <p className="text-xs text-slate-500 mb-2 font-semibold">
+              {isIndonesian ? 'Akun User Perusahaan:' : 'Company User Accounts:'}
+            </p>
+            <div className="bg-slate-50 rounded-lg p-3 space-y-1 text-xs text-slate-700">
+              <p><code className="bg-white px-1 rounded">superadminnsp</code> | nspmeranti@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admmujurlestari</code> | admmujurlestari@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admgrutilestaripratama</code> | admgrutilestaripratama@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">Sampoerna Agro</code> | superadmsampoernaagro@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admfajarpematangindahlestari</code> | admfajarpematangindahlestari@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admrambangagrojaya</code> | admrambangagrojaya@gmail.com</p>
+              <p className="pt-2 text-slate-500">
+                {isIndonesian
+                  ? 'Password default untuk user perusahaan mengikuti username.'
+                  : 'Default password for company users is the username.'}
+              </p>
             </div>
           </div>
 

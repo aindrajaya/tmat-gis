@@ -4,9 +4,9 @@
 
 export const API_CONFIG = {
   production: {
-    name: 'Production (Staging)',
+    name: 'Production (KLHK)',
     baseUrl:
-      'https://staging.kurmaspace.com/klhk/app/index.php/api/portal_v1',
+      'https://gambutindonesia.kemenlh.go.id/backoffice-SPAgambut/api/v1',
     description: 'Production API server for live data',
   },
   development: {
@@ -17,6 +17,7 @@ export const API_CONFIG = {
 };
 
 export type ApiMode = 'dev' | 'prod';
+export type ApiKeyMap = Record<string, string>;
 
 /**
  * Get API configuration for selected mode
@@ -41,10 +42,33 @@ export function getApiBaseUrl(mode: ApiMode): string {
  * Get API key from environment
  */
 export function getApiKey(mode: ApiMode): string {
+  const runtime = loadRuntimeApiKeys();
   if (mode === 'prod') {
-    return import.meta.env.VITE_PROD_API_KEY || '';
+    return runtime.adminApiKey || import.meta.env.VITE_PROD_API_KEY_ADMIN || import.meta.env.VITE_PROD_API_KEY || '';
   }
   return import.meta.env.VITE_DEV_API_KEY || '';
+}
+
+/**
+ * Get perusahaan API key map for production mode.
+ * Expected format:
+ * VITE_PROD_API_KEYS_PERUSAHAAN={"19":"keyA","24":"keyB"}
+ */
+export function getPerusahaanApiKeyMap(mode: ApiMode): ApiKeyMap {
+  if (mode !== 'prod') return {};
+  return loadRuntimeApiKeys().perusahaanApiKeys;
+}
+
+/**
+ * Resolve API key by scope.
+ * For production, perusahaan-specific key has priority when perusahaanId is provided.
+ */
+export function resolveApiKey(mode: ApiMode, perusahaanId?: number): string {
+  const adminKey = getApiKey(mode);
+  if (mode !== 'prod' || !perusahaanId) return adminKey;
+
+  const perusahaanKeys = getPerusahaanApiKeyMap(mode);
+  return perusahaanKeys[String(perusahaanId)] || adminKey;
 }
 
 /**
@@ -68,3 +92,4 @@ export function isApiKeyConfigured(mode: ApiMode): boolean {
   const key = getApiKey(mode);
   return key && key.length > 0 && key !== 'TULIS_KEY_PUBLIK_DISINI';
 }
+import { loadRuntimeApiKeys } from './runtimeApiKeys';

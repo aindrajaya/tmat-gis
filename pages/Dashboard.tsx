@@ -12,6 +12,10 @@ const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { filters } = useFilters();
   const { user } = useAuth();
+  const scopeLabel =
+    user?.role === 'perusahaan'
+      ? `Perusahaan ${user.perusahaanName || (user.perusahaanId ? `#${user.perusahaanId}` : '')}`.trim()
+      : null;
   const apiClient = useAPIClient();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
 
@@ -26,7 +30,6 @@ const Dashboard: React.FC = () => {
   const { data: allPerusahaan, loading: perusahaanLoading, error: perusahaanError } = usePerusahaan(user?.perusahaanId || undefined);
   const { data: realtimeData, loading: realtimeLoading, error: realtimeError, refetch: refetchRealtime } = useRealtimeAll(user?.perusahaanId || undefined);
   
-  const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [weeklyChartData, setWeeklyChartData] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<any[]>([]);
@@ -86,9 +89,14 @@ const Dashboard: React.FC = () => {
 
       const startDate = toDateOnly(filters.startDate);
       const endDate = toDateOnly(filters.endDate);
+      const allowedDeviceIds = new Set(
+        devicesForChart.map((device) => device.device_id_unik)
+      );
 
       setChartLoading(true);
       setChartError(null);
+      // Clear stale chart rows first to avoid showing previous scope temporarily.
+      setChartRealtimeData([]);
 
       try {
         const limit = 500;
@@ -126,7 +134,12 @@ const Dashboard: React.FC = () => {
         const rows = settled
           .filter((item): item is PromiseFulfilledResult<RealtimeData[]> => item.status === 'fulfilled')
           .flatMap((item) => item.value)
-          .filter((item) => !!item.device_id_unik && !!extractDatePart(item.timestamp_data));
+          .filter(
+            (item) =>
+              !!item.device_id_unik &&
+              allowedDeviceIds.has(item.device_id_unik) &&
+              !!extractDatePart(item.timestamp_data)
+          );
 
         setChartRealtimeData(rows);
 
@@ -146,6 +159,37 @@ const Dashboard: React.FC = () => {
     [apiClient, filters.startDate, filters.endDate, user?.perusahaanId]
   );
 
+  const filteredDevices = useMemo(() => {
+    if (!allDevices) return [];
+
+    let filtered = allDevices;
+    if (user?.role === 'perusahaan' && user?.perusahaanId) {
+      filtered = filtered.filter((d) => d.id_perusahaan === user.perusahaanId);
+    }
+    if (filters.provinsi) {
+      filtered = filtered.filter((d) => d.provinsi === filters.provinsi);
+    }
+    if (filters.kabupaten) {
+      filtered = filtered.filter((d) => d.kabupaten === filters.kabupaten);
+    }
+    if (filters.jenis_perusahaan && allPerusahaan) {
+      const companyIds = allPerusahaan
+        .filter((p) => p.jenis_perusahaan === filters.jenis_perusahaan)
+        .map((p) => p.id);
+      filtered = filtered.filter((d) => companyIds.includes(d.id_perusahaan));
+    }
+
+    return filtered;
+  }, [
+    allDevices,
+    allPerusahaan,
+    filters.provinsi,
+    filters.kabupaten,
+    filters.jenis_perusahaan,
+    user?.role,
+    user?.perusahaanId,
+  ]);
+
   // Get unique devices in critical state (TMAT < -0.4)
   const criticalDevices = useMemo(() => {
     if (!realtimeData || !filteredDevices.length) return new Set();
@@ -162,28 +206,9 @@ const Dashboard: React.FC = () => {
     return criticalSet;
   }, [realtimeData, filteredDevices]);
 
-  // Filter devices and prepare chart data
   useEffect(() => {
-    if (!allDevices) return;
-
-    // 1. Filter Devices based on active filters
-    let filtered = allDevices;
-    if (filters.provinsi) {
-      filtered = filtered.filter(d => d.provinsi === filters.provinsi);
-    }
-    if (filters.kabupaten) {
-      filtered = filtered.filter(d => d.kabupaten === filters.kabupaten);
-    }
-    if (filters.jenis_perusahaan && allPerusahaan) {
-      // Join logic: filter companies by type, then devices by company ID
-      const companyIds = allPerusahaan
-        .filter(p => p.jenis_perusahaan === filters.jenis_perusahaan)
-        .map(p => p.id);
-      filtered = filtered.filter(d => companyIds.includes(d.id_perusahaan));
-    }
-    setFilteredDevices(filtered);
-    fetchHistoricalByDevices(filtered);
-  }, [filters, allDevices, allPerusahaan, fetchHistoricalByDevices]);
+    fetchHistoricalByDevices(filteredDevices);
+  }, [filteredDevices, fetchHistoricalByDevices]);
 
   useEffect(() => {
     // 2. Prepare Chart Data from historical realtime_device data
@@ -427,6 +452,7 @@ const Dashboard: React.FC = () => {
         weeklyData={weeklyChartData}
         trendData={trendData}
         selectedCity={filters.selectedCity || undefined}
+        scopeLabel={scopeLabel}
         mapRef={mapRef}
         barChartRef={barChartRef}
         statusTrendRef={statusTrendRef}

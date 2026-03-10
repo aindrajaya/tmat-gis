@@ -54,6 +54,9 @@ const FullMap: React.FC = () => {
     if (!allDevices) return [];
 
     let filtered = allDevices;
+    if (user?.role === 'perusahaan' && user?.perusahaanId) {
+      filtered = filtered.filter((d) => d.id_perusahaan === user.perusahaanId);
+    }
     if (filters.provinsi) {
       filtered = filtered.filter((d) => d.provinsi === filters.provinsi);
     }
@@ -67,7 +70,7 @@ const FullMap: React.FC = () => {
       filtered = filtered.filter((d) => companyIds.includes(d.id_perusahaan));
     }
     return filtered;
-  }, [allDevices, allPerusahaan, filters]);
+  }, [allDevices, allPerusahaan, filters, user?.role, user?.perusahaanId]);
 
   // Realtime data scoped to filtered devices and date range
   const relevantRealtimeData = useMemo(() => {

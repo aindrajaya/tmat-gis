@@ -571,7 +571,12 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
 
   // Apply filters to devices
   const filteredDevices = useMemo(() => {
-    const byUiFilter = devices.filter(device => {
+    const byCompanyScope =
+      user?.role === 'perusahaan' && user?.perusahaanId
+        ? devices.filter((device) => device.id_perusahaan === user.perusahaanId)
+        : devices;
+
+    const byUiFilter = byCompanyScope.filter(device => {
       if (filters.provinsi && device.provinsi !== filters.provinsi) return false;
       if (filters.kabupaten && device.kabupaten !== filters.kabupaten) return false;
       if (filters.kecamatan && device.kota !== filters.kecamatan) return false;
@@ -601,7 +606,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       Number.isFinite(device.longitude) &&
       !(device.latitude === 0 && device.longitude === 0)
     );
-  }, [devices, filters]);
+  }, [devices, filters, user?.role, user?.perusahaanId]);
 
   // Debug logging
   useEffect(() => {

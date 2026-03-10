@@ -508,7 +508,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   
   // Toggle settings
   const [showDistrictLayer, setShowDistrictLayer] = useState(false);
-  const [showMarkers, setShowMarkers] = useState(false);
+  const [showMarkers, setShowMarkers] = useState(true);
   
   // Persistent cache for village-voronoi overlap calculations
   // This persists across toggle on/off to avoid recalculation
@@ -571,7 +571,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
 
   // Apply filters to devices
   const filteredDevices = useMemo(() => {
-    return devices.filter(device => {
+    const byUiFilter = devices.filter(device => {
       if (filters.provinsi && device.provinsi !== filters.provinsi) return false;
       if (filters.kabupaten && device.kabupaten !== filters.kabupaten) return false;
       if (filters.kecamatan && device.kota !== filters.kecamatan) return false;
@@ -594,6 +594,13 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       
       return true;
     });
+
+    // Keep only devices with valid coordinates for map rendering.
+    return byUiFilter.filter(device =>
+      Number.isFinite(device.latitude) &&
+      Number.isFinite(device.longitude) &&
+      !(device.latitude === 0 && device.longitude === 0)
+    );
   }, [devices, filters]);
 
   // Debug logging
@@ -602,7 +609,16 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     console.log('[DashboardMap] Filtered devices:', filteredDevices?.length);
     console.log('[DashboardMap] Realtime data:', realtimeData?.length);
     console.log('[DashboardMap] Loading:', realtimeLoading);
-  }, [devices, filteredDevices, realtimeData, realtimeLoading]);
+    console.log('[DashboardMap] Marker visibility:', showMarkers);
+    console.log(
+      '[DashboardMap] Sample marker coordinates:',
+      filteredDevices.slice(0, 3).map((d) => ({
+        id: d.device_id_unik,
+        lat: d.latitude,
+        lng: d.longitude,
+      }))
+    );
+  }, [devices, filteredDevices, realtimeData, realtimeLoading, showMarkers]);
 
   // Create a map of device -> latest realtime data
   const deviceDataMap = useMemo(() => {
@@ -730,7 +746,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     return groups;
   }, [filteredDevices]);
 
-  // Group devices by city with center coordinates and statistics
+  // Group devices by city/regency with center coordinates and statistics
   const cityGroups: Map<string, {
       city: string;
       provinsi: string;
@@ -765,10 +781,15 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     }>();
 
     filteredDevices.forEach(device => {
-      const cityKey = `${device.kota}, ${device.provinsi}`;
+      const normalizedCity =
+        (typeof device.kota === 'string' && device.kota.trim()) ||
+        (typeof device.kabupaten === 'string' && device.kabupaten.trim()) ||
+        (typeof device.provinsi === 'string' && device.provinsi.trim()) ||
+        'Unknown';
+      const cityKey = `${normalizedCity}, ${device.provinsi}`;
       if (!cities.has(cityKey)) {
         cities.set(cityKey, {
-          city: device.kota,
+          city: normalizedCity,
           provinsi: device.provinsi,
           devices: [],
           centerLat: 0,
@@ -1090,13 +1111,15 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
           />
         )}
 
-        {/* Render city-level markers - Always visible */}
-        <CityMarkersLayer
-          cityGroups={cityGroups}
-          isLoading={realtimeLoading}
-          isIndonesian={isIndonesian}
-          onCityClick={handleCityClick}
-        />
+        {/* Render city-level summary markers only when device markers are hidden */}
+        {!showMarkers && (
+          <CityMarkersLayer
+            cityGroups={cityGroups}
+            isLoading={realtimeLoading}
+            isIndonesian={isIndonesian}
+            onCityClick={handleCityClick}
+          />
+        )}
 
         {/* Render grouped device markers on top - Conditional */}
         <DeviceMarkersLayer

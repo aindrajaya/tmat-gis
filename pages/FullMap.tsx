@@ -85,8 +85,20 @@ const FullMap: React.FC = () => {
     
     const deviceIds = new Set(scopedDevices.map((d) => d.device_id_unik));
 
+    // Check if we're on the public /map route
+    const isPublicMapRoute = typeof window !== 'undefined' && (
+      window.location.hash === '#/map' ||
+      window.location.hash.startsWith('#/map?') ||
+      window.location.hash.startsWith('#/map/')
+    );
+
     return realtimeData.filter((r) => {
       if (!deviceIds.has(r.device_id_unik)) return false;
+      
+      // Skip date filtering on public /map route to show all available data
+      if (isPublicMapRoute) return true;
+      
+      // Apply date filters on other routes
       const dataDate = r.timestamp_data.split(' ')[0];
       const matchesStart = !filters.startDate || dataDate >= filters.startDate;
       const matchesEnd = !filters.endDate || dataDate <= filters.endDate;

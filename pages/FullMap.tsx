@@ -97,12 +97,12 @@ const FullMap: React.FC = () => {
   // Daily chart data
   const dailyChartData = useMemo(() => {
     if (relevantRealtimeData.length === 0) return [];
-    const dailyAggregation: Record<string, { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
+    const dailyAggregation: Record<string, { offline: number; safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
 
     relevantRealtimeData.forEach((r: RealtimeData) => {
       const date = r.timestamp_data.split(' ')[0];
       if (!dailyAggregation[date]) {
-        dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
+        dailyAggregation[date] = { offline: 0, safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
       }
 
       if (r.tmat_value < -0.6) {
@@ -128,13 +128,13 @@ const FullMap: React.FC = () => {
   // Weekly chart data
   const weeklyChartData = useMemo(() => {
     if (relevantRealtimeData.length === 0) return [];
-    const weeklyAggregation: Record<string, { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
+    const weeklyAggregation: Record<string, { offline: number; safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
 
     relevantRealtimeData.forEach((r: RealtimeData) => {
       const date = r.timestamp_data.split(' ')[0];
       const weekStart = getWeekStart(date);
       if (!weeklyAggregation[weekStart]) {
-        weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
+        weeklyAggregation[weekStart] = { offline: 0, safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
       }
 
       if (r.tmat_value < -0.6) {

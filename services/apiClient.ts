@@ -25,6 +25,38 @@ export interface ApiConfig {
   perusahaanApiKeys: Record<string, string>;
 }
 
+let temporaryAdminApiKeyOverride = '';
+
+function resolveClientBootstrapConfig(): {
+  apiMode: 'dev' | 'prod';
+  baseUrl: string;
+  adminApiKey: string;
+  perusahaanApiKeys: Record<string, string>;
+} {
+  const apiMode = (import.meta.env.VITE_API_MODE || 'dev') as 'dev' | 'prod';
+
+  const baseUrl =
+    apiMode === 'prod'
+      ? import.meta.env.VITE_PROD_API_URL ||
+        'https://gambutindonesia.kemenlh.go.id/backoffice-SPAgambut/api/v1'
+      : import.meta.env.VITE_DEV_API_URL ||
+        'https://coloured-riannon-aruskoding-eb6d5815.koyeb.app/api/portal_v1';
+
+  const runtimeKeys = loadRuntimeApiKeys();
+  const envAdminKey =
+    apiMode === 'prod'
+      ? import.meta.env.VITE_PROD_API_KEY_ADMIN || import.meta.env.VITE_PROD_API_KEY || ''
+      : import.meta.env.VITE_DEV_API_KEY || '';
+
+  return {
+    apiMode,
+    baseUrl,
+    adminApiKey:
+      temporaryAdminApiKeyOverride || runtimeKeys.adminApiKey || envAdminKey,
+    perusahaanApiKeys: apiMode === 'prod' ? runtimeKeys.perusahaanApiKeys : {},
+  };
+}
+
 export class APIClient {
   private config: ApiConfig;
   private readonly debugPrefix = '[APIClient]';
@@ -799,22 +831,8 @@ export class APIClient {
  * Create API client instance with environment variables
  */
 export function createAPIClient(): APIClient {
-  const apiMode = (import.meta.env.VITE_API_MODE || 'dev') as 'dev' | 'prod';
-
-  const baseUrl =
-    apiMode === 'prod'
-      ? import.meta.env.VITE_PROD_API_URL ||
-        'https://gambutindonesia.kemenlh.go.id/backoffice-SPAgambut/api/v1'
-      : import.meta.env.VITE_DEV_API_URL ||
-        'https://coloured-riannon-aruskoding-eb6d5815.koyeb.app/api/portal_v1';
-
-  const runtimeKeys = loadRuntimeApiKeys();
-  const envAdminKey =
-    apiMode === 'prod'
-      ? import.meta.env.VITE_PROD_API_KEY_ADMIN || import.meta.env.VITE_PROD_API_KEY || ''
-      : import.meta.env.VITE_DEV_API_KEY || '';
-  const adminApiKey = runtimeKeys.adminApiKey || envAdminKey;
-  const perusahaanApiKeys = apiMode === 'prod' ? runtimeKeys.perusahaanApiKeys : {};
+  const { apiMode, baseUrl, adminApiKey, perusahaanApiKeys } =
+    resolveClientBootstrapConfig();
 
   if (!adminApiKey) {
     console.warn(
@@ -844,16 +862,27 @@ export function resetAPIClient(): void {
   apiClientInstance = null;
 }
 
+function syncAPIClientConfig(): void {
+  if (!apiClientInstance) return;
+
+  const { baseUrl, adminApiKey, perusahaanApiKeys } =
+    resolveClientBootstrapConfig();
+  apiClientInstance.updateConfig(baseUrl, adminApiKey, perusahaanApiKeys);
+}
+
+export function setTemporaryAdminApiKeyOverride(apiKey: string): void {
+  temporaryAdminApiKeyOverride = apiKey.trim();
+  syncAPIClientConfig();
+}
+
+export function clearTemporaryAdminApiKeyOverride(): void {
+  temporaryAdminApiKeyOverride = '';
+  syncAPIClientConfig();
+}
+
 export function setUserAdminApiKey(apiKey: string): void {
   setRuntimeAdminApiKey(apiKey);
-  if (apiClientInstance) {
-    const config = apiClientInstance.getConfig();
-    apiClientInstance.updateConfig(
-      config.baseUrl,
-      apiKey.trim(),
-      config.perusahaanApiKeys
-    );
-  }
+  syncAPIClientConfig();
 }
 
 export function setUserPerusahaanApiKey(
@@ -861,29 +890,15 @@ export function setUserPerusahaanApiKey(
   apiKey: string
 ): void {
   setRuntimePerusahaanApiKey(perusahaanId, apiKey);
-  if (apiClientInstance) {
-    const config = apiClientInstance.getConfig();
-    apiClientInstance.updateConfig(config.baseUrl, config.adminApiKey, {
-      ...config.perusahaanApiKeys,
-      [String(perusahaanId)]: apiKey.trim(),
-    });
-  }
+  syncAPIClientConfig();
 }
 
 export function removeUserPerusahaanApiKey(perusahaanId: number): void {
   removeRuntimePerusahaanApiKey(perusahaanId);
-  if (apiClientInstance) {
-    const config = apiClientInstance.getConfig();
-    const next = { ...config.perusahaanApiKeys };
-    delete next[String(perusahaanId)];
-    apiClientInstance.updateConfig(config.baseUrl, config.adminApiKey, next);
-  }
+  syncAPIClientConfig();
 }
 
 export function clearUserApiKeys(): void {
   clearRuntimeApiKeys();
-  if (apiClientInstance) {
-    const config = apiClientInstance.getConfig();
-    apiClientInstance.updateConfig(config.baseUrl, '', {});
-  }
+  syncAPIClientConfig();
 }

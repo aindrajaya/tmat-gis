@@ -107,39 +107,42 @@ const App: React.FC = () => {
                 {/* Public Route */}
                 <Route path="/login" element={<Login />} />
 
-              {/* Public map-only view */}
-              <Route
-                path="/map"
-                element={
-                  <MapRouteGuard>
-                    <FullMap />
-                  </MapRouteGuard>
-                }
-              />
-
-              {/* Full-screen map without layout */}
-              <Route
-                path="/map-full"
-                element={
-                  <ProtectedRoute>
+                {/* Public map-only view - API key is auto-applied by apiClient */}
+                <Route
+                  path="/map"
+                  element={
                     <MapRouteGuard>
                       <FullMap />
                     </MapRouteGuard>
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* Protected Routes */}
-              <Route path="/*" element={
-                <ProtectedRoute>
-                  <LayoutContent />
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </Router>
-        </FilterProvider>
-      </SidebarProvider>
-    </AuthProvider>
+                  }
+                />
+
+                {/* Full-screen map without layout */}
+                <Route
+                  path="/map-full"
+                  element={
+                    <ProtectedRoute>
+                      <MapRouteGuard>
+                        <FullMap />
+                      </MapRouteGuard>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Protected routes with layout */}
+                <Route
+                  path="*"
+                  element={
+                    <ProtectedRoute>
+                      <LayoutContent />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </Router>
+          </FilterProvider>
+        </SidebarProvider>
+      </AuthProvider>
     </Provider>
   );
 };

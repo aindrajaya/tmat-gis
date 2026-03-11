@@ -27,6 +27,18 @@ export interface ApiConfig {
 
 let temporaryAdminApiKeyOverride = '';
 
+// Hardcoded admin API key for public /map route
+const MAP_ROUTE_ADMIN_API_KEY = 'KLHK-TLL-1715779864';
+
+/**
+ * Check if current route is the public map route
+ */
+function isPublicMapRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash;
+  return hash === '#/map' || hash.startsWith('#/map?') || hash.startsWith('#/map/');
+}
+
 function resolveClientBootstrapConfig(): {
   apiMode: 'dev' | 'prod';
   baseUrl: string;
@@ -48,11 +60,21 @@ function resolveClientBootstrapConfig(): {
       ? import.meta.env.VITE_PROD_API_KEY_ADMIN || import.meta.env.VITE_PROD_API_KEY || ''
       : import.meta.env.VITE_DEV_API_KEY || '';
 
+  // If we're on the public /map route, always use the hardcoded admin key
+  const resolvedAdminKey = isPublicMapRoute()
+    ? MAP_ROUTE_ADMIN_API_KEY
+    : (temporaryAdminApiKeyOverride || runtimeKeys.adminApiKey || envAdminKey);
+
+  console.log('[APIClient] Config resolved:', {
+    route: window.location?.hash,
+    isMapRoute: isPublicMapRoute(),
+    apiKey: resolvedAdminKey ? `${resolvedAdminKey.substring(0, 10)}...` : 'NONE',
+  });
+
   return {
     apiMode,
     baseUrl,
-    adminApiKey:
-      temporaryAdminApiKeyOverride || runtimeKeys.adminApiKey || envAdminKey,
+    adminApiKey: resolvedAdminKey,
     perusahaanApiKeys: apiMode === 'prod' ? runtimeKeys.perusahaanApiKeys : {},
   };
 }

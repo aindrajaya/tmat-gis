@@ -1,6 +1,7 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import store from './src/store';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -16,6 +17,18 @@ import { FilterProvider } from './context/FilterContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SidebarProvider, useSidebar } from './context/SidebarContext';
 import { loadRuntimeApiKeys } from './services/runtimeApiKeys';
+
+// Create a React Query client with default options
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (previously cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const ApiKeySetupGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -98,14 +111,15 @@ const AdminRouteGuard: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
 const App: React.FC = () => {
   return (
-    <Provider store={store}>
-      <AuthProvider>
-        <SidebarProvider>
-          <FilterProvider>
-            <Router>
-              <Routes>
-                {/* Public Route */}
-                <Route path="/login" element={<Login />} />
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        <AuthProvider>
+          <SidebarProvider>
+            <FilterProvider>
+              <Router>
+                <Routes>
+                  {/* Public Route */}
+                  <Route path="/login" element={<Login />} />
 
                 {/* Public map-only view - API key is auto-applied by apiClient */}
                 <Route
@@ -143,7 +157,8 @@ const App: React.FC = () => {
           </FilterProvider>
         </SidebarProvider>
       </AuthProvider>
-    </Provider>
+      </Provider>
+    </QueryClientProvider>
   );
 };
 

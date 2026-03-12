@@ -644,7 +644,7 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       </div>
 
       {/* TMAT Trend Chart */}
-      <TMATTrendChart ref={effectiveTmatTrendRef} data={trendData} />
+      {/* <TMATTrendChart ref={effectiveTmatTrendRef} data={trendData} /> */}
     </section>
   );
 };

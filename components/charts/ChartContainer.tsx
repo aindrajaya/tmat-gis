@@ -16,6 +16,7 @@ interface ChartContainerProps {
   weeklyData: any[];
   trendData: any[];
   selectedCity?: string | null;
+  scopeLabel?: string | null;
   mapRef?: RefObject<HTMLDivElement | null>;
   barChartRef?: RefObject<HTMLDivElement | null>;
   statusTrendRef?: RefObject<HTMLDivElement | null>;
@@ -29,6 +30,7 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   weeklyData,
   trendData,
   selectedCity,
+  scopeLabel,
   mapRef,
   barChartRef,
   statusTrendRef,
@@ -516,7 +518,9 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
         <h2 className="text-lg font-bold text-slate-800">
           {selectedCity 
             ? `${t('dashboard:charts.analyticsTitle')} Daerah ${selectedCity}`
-            : `${t('dashboard:charts.analyticsTitle')} Nasional`
+            : scopeLabel
+              ? `${t('dashboard:charts.analyticsTitle')} ${scopeLabel}`
+              : `${t('dashboard:charts.analyticsTitle')} Nasional`
           }
         </h2>
         <div className="flex gap-2 items-center">
@@ -640,7 +644,7 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       </div>
 
       {/* TMAT Trend Chart */}
-      {/* <TMATTrendChart ref={effectiveTmatTrendRef} data={trendData} /> */}
+      <TMATTrendChart ref={effectiveTmatTrendRef} data={trendData} />
     </section>
   );
 };

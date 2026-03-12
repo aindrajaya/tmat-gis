@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFilters } from '../context/FilterContext';
-import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
+import { useAPIClient, useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
 import DashboardMap from '../components/DashboardMap';
 import FilterPanel from '../components/FilterPanel';
 import ChartContainer from '../components/charts/ChartContainer';
@@ -12,6 +12,11 @@ const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const { filters } = useFilters();
   const { user } = useAuth();
+  const scopeLabel =
+    user?.role === 'perusahaan'
+      ? `Perusahaan ${user.perusahaanName || (user.perusahaanId ? `#${user.perusahaanId}` : '')}`.trim()
+      : null;
+  const apiClient = useAPIClient();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
 
   // Refs for capturing graphics in PDF export
@@ -25,10 +30,12 @@ const Dashboard: React.FC = () => {
   const { data: allPerusahaan, loading: perusahaanLoading, error: perusahaanError } = usePerusahaan(user?.perusahaanId || undefined);
   const { data: realtimeData, loading: realtimeLoading, error: realtimeError, refetch: refetchRealtime } = useRealtimeAll(user?.perusahaanId || undefined);
   
-  const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [weeklyChartData, setWeeklyChartData] = useState<any[]>([]);
   const [trendData, setTrendData] = useState<any[]>([]);
+  const [chartRealtimeData, setChartRealtimeData] = useState<RealtimeData[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [chartError, setChartError] = useState<Error | null>(null);
 
   // Helper function to get week start date (Monday)
   const getWeekStart = (date: string): string => {
@@ -47,6 +54,142 @@ const Dashboard: React.FC = () => {
     return `${start.toLocaleDateString('en-CA')} - ${end.toLocaleDateString('en-CA')}`;
   };
 
+  const extractDatePart = (timestamp: unknown): string | null => {
+    if (typeof timestamp !== 'string') return null;
+    const value = timestamp.trim();
+    if (!value) return null;
+    if (value.includes(' ')) return value.split(' ')[0] || null;
+    if (value.includes('T')) return value.split('T')[0] || null;
+    return value.length >= 10 ? value.slice(0, 10) : null;
+  };
+
+  const extractTimePart = (timestamp: unknown): string | null => {
+    if (typeof timestamp !== 'string') return null;
+    const value = timestamp.trim();
+    if (!value) return null;
+    if (value.includes(' ')) return value.split(' ')[1] || null;
+    if (value.includes('T')) return value.split('T')[1] || null;
+    return null;
+  };
+
+  const toDateOnly = (value: string | null | undefined): string => {
+    if (!value) {
+      return new Date().toISOString().split('T')[0];
+    }
+    return value;
+  };
+
+  const fetchHistoricalByDevices = useCallback(
+    async (devicesForChart: Device[]) => {
+      if (!devicesForChart.length) {
+        setChartRealtimeData([]);
+        setChartError(null);
+        return;
+      }
+
+      const startDate = toDateOnly(filters.startDate);
+      const endDate = toDateOnly(filters.endDate);
+      const allowedDeviceIds = new Set(
+        devicesForChart.map((device) => device.device_id_unik)
+      );
+
+      setChartLoading(true);
+      setChartError(null);
+      // Clear stale chart rows first to avoid showing previous scope temporarily.
+      setChartRealtimeData([]);
+
+      try {
+        const limit = 500;
+
+        const fetchAllPagesForDevice = async (deviceId: string): Promise<RealtimeData[]> => {
+          let offset = 0;
+          let keepGoing = true;
+          let safety = 0;
+          const allRows: RealtimeData[] = [];
+
+          while (keepGoing && safety < 20) {
+            const rows = await apiClient.getRealtimeDevice(
+              deviceId,
+              startDate,
+              endDate,
+              limit,
+              offset,
+              user?.perusahaanId || undefined
+            );
+            allRows.push(...rows);
+            if (rows.length < limit) {
+              keepGoing = false;
+            } else {
+              offset += limit;
+            }
+            safety += 1;
+          }
+          return allRows;
+        };
+
+        const settled = await Promise.allSettled(
+          devicesForChart.map((device) => fetchAllPagesForDevice(device.device_id_unik))
+        );
+
+        const rows = settled
+          .filter((item): item is PromiseFulfilledResult<RealtimeData[]> => item.status === 'fulfilled')
+          .flatMap((item) => item.value)
+          .filter(
+            (item) =>
+              !!item.device_id_unik &&
+              allowedDeviceIds.has(item.device_id_unik) &&
+              !!extractDatePart(item.timestamp_data)
+          );
+
+        setChartRealtimeData(rows);
+
+        const failedCount = settled.filter((item) => item.status === 'rejected').length;
+        if (failedCount > 0) {
+          console.warn(
+            `[Dashboard] ${failedCount} device history request(s) failed while building national analytics.`
+          );
+        }
+      } catch (error) {
+        setChartRealtimeData([]);
+        setChartError(error instanceof Error ? error : new Error(String(error)));
+      } finally {
+        setChartLoading(false);
+      }
+    },
+    [apiClient, filters.startDate, filters.endDate, user?.perusahaanId]
+  );
+
+  const filteredDevices = useMemo(() => {
+    if (!allDevices) return [];
+
+    let filtered = allDevices;
+    if (user?.role === 'perusahaan' && user?.perusahaanId) {
+      filtered = filtered.filter((d) => d.id_perusahaan === user.perusahaanId);
+    }
+    if (filters.provinsi) {
+      filtered = filtered.filter((d) => d.provinsi === filters.provinsi);
+    }
+    if (filters.kabupaten) {
+      filtered = filtered.filter((d) => d.kabupaten === filters.kabupaten);
+    }
+    if (filters.jenis_perusahaan && allPerusahaan) {
+      const companyIds = allPerusahaan
+        .filter((p) => p.jenis_perusahaan === filters.jenis_perusahaan)
+        .map((p) => p.id);
+      filtered = filtered.filter((d) => companyIds.includes(d.id_perusahaan));
+    }
+
+    return filtered;
+  }, [
+    allDevices,
+    allPerusahaan,
+    filters.provinsi,
+    filters.kabupaten,
+    filters.jenis_perusahaan,
+    user?.role,
+    user?.perusahaanId,
+  ]);
+
   // Get unique devices in critical state (TMAT < -0.4)
   const criticalDevices = useMemo(() => {
     if (!realtimeData || !filteredDevices.length) return new Set();
@@ -63,36 +206,20 @@ const Dashboard: React.FC = () => {
     return criticalSet;
   }, [realtimeData, filteredDevices]);
 
-  // Filter devices and prepare chart data
   useEffect(() => {
-    if (!allDevices) return;
+    fetchHistoricalByDevices(filteredDevices);
+  }, [filteredDevices, fetchHistoricalByDevices]);
 
-    // 1. Filter Devices based on active filters
-    let filtered = allDevices;
-    if (filters.provinsi) {
-      filtered = filtered.filter(d => d.provinsi === filters.provinsi);
-    }
-    if (filters.kabupaten) {
-      filtered = filtered.filter(d => d.kabupaten === filters.kabupaten);
-    }
-    if (filters.jenis_perusahaan && allPerusahaan) {
-      // Join logic: filter companies by type, then devices by company ID
-      const companyIds = allPerusahaan
-        .filter(p => p.jenis_perusahaan === filters.jenis_perusahaan)
-        .map(p => p.id);
-      filtered = filtered.filter(d => companyIds.includes(d.id_perusahaan));
-    }
-    setFilteredDevices(filtered);
-
-    // 2. Prepare Chart Data from Real API Data
-    if (realtimeData && realtimeData.length > 0) {
-      const deviceIds = filtered.map(d => d.device_id_unik);
-      let relevantData = realtimeData.filter(r => deviceIds.includes(r.device_id_unik));
+  useEffect(() => {
+    // 2. Prepare Chart Data from historical realtime_device data
+    if (chartRealtimeData && chartRealtimeData.length > 0) {
+      const deviceIds = filteredDevices.map(d => d.device_id_unik);
+      let relevantData = chartRealtimeData.filter(r => deviceIds.includes(r.device_id_unik));
 
       // If a city is selected, filter devices by that city first
-      let applicableDevices = filtered; // Track which devices to use for offline calculation
+      let applicableDevices = filteredDevices; // Track which devices to use for offline calculation
       if (filters.selectedCity) {
-        const cityDevices = filtered.filter(d => d.kota === filters.selectedCity);
+        const cityDevices = filteredDevices.filter(d => d.kota === filters.selectedCity);
         applicableDevices = cityDevices;
         const cityDeviceIds = cityDevices.map(d => d.device_id_unik);
         relevantData = relevantData.filter(r => cityDeviceIds.includes(r.device_id_unik));
@@ -105,7 +232,8 @@ const Dashboard: React.FC = () => {
       // Apply date filters if set
       if (filters.startDate || filters.endDate) {
         relevantData = relevantData.filter(r => {
-          const dataDate = r.timestamp_data.split(' ')[0]; // Extract YYYY-MM-DD
+          const dataDate = extractDatePart(r.timestamp_data);
+          if (!dataDate) return false;
           const matchesStart = !filters.startDate || dataDate >= filters.startDate;
           const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
           return matchesStart && matchesEnd;
@@ -116,7 +244,8 @@ const Dashboard: React.FC = () => {
       const dailyAggregation: { [date: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
       
       relevantData.forEach(r => {
-        const date = r.timestamp_data.split(' ')[0]; // Extract date
+        const date = extractDatePart(r.timestamp_data);
+        if (!date) return;
         if (!dailyAggregation[date]) {
           dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
         }
@@ -142,7 +271,7 @@ const Dashboard: React.FC = () => {
       Object.keys(dailyAggregation).forEach(date => {
         const devicesWithDataOnDate = new Set(
           relevantData
-            .filter(r => r.timestamp_data.split(' ')[0] === date)
+            .filter(r => extractDatePart(r.timestamp_data) === date)
             .map(r => r.device_id_unik)
         );
         // Offline = aktif devices - devices that reported on this day
@@ -160,7 +289,8 @@ const Dashboard: React.FC = () => {
       const weeklyAggregation: { [weekStart: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
       
       relevantData.forEach(r => {
-        const date = r.timestamp_data.split(' ')[0];
+        const date = extractDatePart(r.timestamp_data);
+        if (!date) return;
         const weekStart = getWeekStart(date);
         if (!weeklyAggregation[weekStart]) {
           weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
@@ -185,7 +315,10 @@ const Dashboard: React.FC = () => {
       Object.keys(weeklyAggregation).forEach(weekStart => {
         const devicesWithDataInWeek = new Set(
           relevantData
-            .filter(r => getWeekStart(r.timestamp_data.split(' ')[0]) === weekStart)
+            .filter(r => {
+              const date = extractDatePart(r.timestamp_data);
+              return date ? getWeekStart(date) === weekStart : false;
+            })
             .map(r => r.device_id_unik)
         );
         // Offline = aktif devices - devices that reported in this week
@@ -207,17 +340,20 @@ const Dashboard: React.FC = () => {
       const trendDataArray = relevantData
         .slice(-10)
         .map(d => ({
-          time: d.timestamp_data.split(' ')[1] || d.timestamp_data, // Time only, fallback to full timestamp
+          time: extractTimePart(d.timestamp_data) || String(d.timestamp_data || ''), // Time only, fallback to full timestamp
           tmat: d.tmat_value
         }));
       
       setTrendData(trendDataArray);
+    } else {
+      setChartData([]);
+      setWeeklyChartData([]);
+      setTrendData([]);
     }
-
-  }, [filters, allDevices, allPerusahaan, realtimeData]);
+  }, [filters, filteredDevices, chartRealtimeData]);
 
   // Handle loading and errors
-  if (devicesLoading || perusahaanLoading || realtimeLoading) {
+  if (devicesLoading || perusahaanLoading || realtimeLoading || chartLoading) {
     return (
       <div className="p-6">
         <div className="text-center py-12">
@@ -230,19 +366,20 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (devicesError || perusahaanError || realtimeError) {
+  if (devicesError || perusahaanError || realtimeError || chartError) {
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <h3 className="font-bold text-red-800 mb-2">Error loading dashboard</h3>
           <p className="text-red-600 mb-4">
-            {devicesError?.message || perusahaanError?.message || realtimeError?.message}
+            {devicesError?.message || perusahaanError?.message || realtimeError?.message || chartError?.message}
           </p>
           <div className="flex gap-2">
             <button 
               onClick={() => {
                 refetchDevices();
                 refetchRealtime();
+                fetchHistoricalByDevices(filteredDevices);
               }}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
             >
@@ -315,6 +452,7 @@ const Dashboard: React.FC = () => {
         weeklyData={weeklyChartData}
         trendData={trendData}
         selectedCity={filters.selectedCity || undefined}
+        scopeLabel={scopeLabel}
         mapRef={mapRef}
         barChartRef={barChartRef}
         statusTrendRef={statusTrendRef}

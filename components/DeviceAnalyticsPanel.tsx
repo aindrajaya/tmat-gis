@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Device, RealtimeData } from '../types';
-import { useRealtimeDevice } from '../services/useApi';
-import { MOCK_DEVICES, MOCK_REALTIME } from '../services/mockData';
+import { useAPIClient, useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
+import { useAuth } from '../context/AuthContext';
 import TMATTrendChart from './charts/TMATTrendChart';
 import { X, ChevronUp, MapPin, Droplet, Thermometer, TestTube } from 'lucide-react';
 import { getWaterLevelStatus } from '../utils/waterLevelStatus';
@@ -15,27 +15,117 @@ interface Props {
 }
 
 const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, onClose }) => {
-  // Only show panel when device is actually selected (clicked)
-  if (!selectedDevice) return null;
-
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
-  const filters = useFilters();
+  const { filters } = useFilters();
+  const { user } = useAuth();
+  const apiClient = useAPIClient();
+  const { data: realtimeSnapshotData } = useRealtimeAll(user?.perusahaanId || undefined);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [historicalData, setHistoricalData] = useState<RealtimeData[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<Error | null>(null);
 
-  // Query API for historical data using the resolved device id. 
-  // Hardcode November 19-25, 2025 to ensure we get the full week of data
-  const { data: historicalDataFromApi, loading: historyLoading } = useRealtimeDevice(
-    selectedDevice.device_id_unik,
-    '2025-11-19',
-    '2025-11-25'
-  );
+  const resolveDate = (value?: string): string => {
+    if (value && value.trim()) return value;
+    return new Date().toISOString().split('T')[0];
+  };
+  const historyStartDate = resolveDate(filters.startDate);
+  const historyEndDate = resolveDate(filters.endDate);
 
-  // Choose API data if available, otherwise use mock realtime history filtered by device (fallback)
-  // Mock data - no date filtering for development/demo purposes
-  const historicalData: RealtimeData[] = (historicalDataFromApi && historicalDataFromApi.length > 0)
-    ? historicalDataFromApi
-    : MOCK_REALTIME.filter(r => r.device_id_unik === selectedDevice.device_id_unik);
+  const formatTimestamp = (value?: string): string => {
+    if (!value || !value.trim()) return '-';
+
+    const raw = value.trim();
+    const normalized = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+    const parsed = new Date(normalized);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return raw; // show raw string instead of "Invalid Date"
+    }
+
+    return parsed.toLocaleString(isIndonesian ? 'id-ID' : 'en-US');
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchHistoricalData = async () => {
+      if (!selectedDevice?.device_id_unik) {
+        setHistoricalData([]);
+        setHistoryError(null);
+        setHistoryLoading(false);
+        return;
+      }
+
+      setHistoryLoading(true);
+      setHistoryError(null);
+
+      try {
+        const limit = 500;
+        let offset = 0;
+        let safety = 0;
+        const rows: RealtimeData[] = [];
+
+        while (safety < 50) {
+          const page = await apiClient.getRealtimeDevice(
+            selectedDevice.device_id_unik,
+            historyStartDate,
+            historyEndDate,
+            limit,
+            offset,
+            user?.perusahaanId || undefined
+          );
+
+          if (!page.length) break;
+          rows.push(...page);
+
+          if (page.length < limit) break;
+          offset += limit;
+          safety += 1;
+        }
+
+        const seen = new Set<string>();
+        const deduped = rows.filter((row) => {
+          const key = `${row.id ?? ''}|${row.device_id_unik}|${row.timestamp_data}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        deduped.sort(
+          (a, b) =>
+            new Date(a.timestamp_data).getTime() -
+            new Date(b.timestamp_data).getTime()
+        );
+
+        if (!cancelled) {
+          setHistoricalData(deduped);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setHistoricalData([]);
+          setHistoryError(error instanceof Error ? error : new Error(String(error)));
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false);
+        }
+      }
+    };
+
+    fetchHistoricalData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    apiClient,
+    selectedDevice?.device_id_unik,
+    historyStartDate,
+    historyEndDate,
+    user?.perusahaanId,
+  ]);
 
   // Format historical data for chart if available
   const trendChartData = useMemo(() => {
@@ -43,7 +133,9 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
       return [];
     }
 
-    return historicalData.map(data => {
+    return [...historicalData]
+      .sort((a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime())
+      .map(data => {
       const formattedDate = new Date(data.timestamp_data).toLocaleDateString(isIndonesian ? 'id-ID' : 'en-US', {
         month: 'short',
         day: 'numeric',
@@ -61,15 +153,31 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
     });
   }, [historicalData, isIndonesian]);
 
-  // Determine current realtime reading: prefer prop, otherwise take latest from mock data for this device
-  // Mock data - no date filtering for development/demo purposes
+  const selectedDeviceSnapshot = useMemo(() => {
+    if (!selectedDevice?.device_id_unik || !realtimeSnapshotData?.length) return null;
+    const target = selectedDevice.device_id_unik.trim();
+    return (
+      realtimeSnapshotData.find(
+        (row) => String(row.device_id_unik || '').trim() === target
+      ) || null
+    );
+  }, [selectedDevice?.device_id_unik, realtimeSnapshotData]);
+
+  // Determine current reading: prefer realtime snapshot prop, otherwise latest point from device history.
   const currentRealtime: RealtimeData | null = realtimeData
-    ?? (MOCK_REALTIME
+    ?? selectedDeviceSnapshot
+    ?? (selectedDevice
+      ? historicalData
       .filter(r => r.device_id_unik === selectedDevice.device_id_unik)
       .sort((a, b) => new Date(b.timestamp_data).getTime() - new Date(a.timestamp_data).getTime())[0]
+      : undefined
     ) ?? null;
 
   const currentStatus = currentRealtime ? getWaterLevelStatus(currentRealtime.tmat_value, isIndonesian) : null;
+  const lastUpdatedValue = currentRealtime?.timestamp_data || selectedDevice?.last_online || '';
+
+  // Only show panel when device is actually selected (clicked)
+  if (!selectedDevice) return null;
 
   return (
     <div
@@ -122,7 +230,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
         <div className="overflow-y-auto" style={{ maxHeight: isExpanded ? 'calc(100vh - 80px)' : 'calc(24rem - 60px)' }}>
           <div className="p-4 space-y-4">
             {/* Current Status Section */}
-            {currentRealtime && currentStatus && (
+            {selectedDevice && (
               <div className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-lg p-4 border border-emerald-200">
                 <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-2">
                   <MapPin size={14} className="text-emerald-600" />
@@ -137,11 +245,11 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     <div
                       className="inline-block text-xs px-3 py-1.5 rounded-full font-bold"
                       style={{
-                        backgroundColor: `${currentStatus.color}20`,
-                        color: currentStatus.color
+                        backgroundColor: `${(currentStatus?.color || '#64748b')}20`,
+                        color: currentStatus?.color || '#64748b'
                       }}
                     >
-                      {currentStatus.level}
+                      {currentStatus?.level || (isIndonesian ? 'Belum ada data realtime' : 'No realtime data yet')}
                     </div>
                   </div>
 
@@ -149,7 +257,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                   <div className="bg-white rounded-lg p-3 border border-slate-100">
                     <p className="text-xs text-slate-500 mb-1">TMAT</p>
                     <div className="flex items-center gap-2">
-                      <Droplet size={14} style={{ color: currentStatus.color }} />
+                      <Droplet size={14} style={{ color: currentStatus?.color || '#64748b' }} />
                       <span className="text-sm font-bold text-slate-800">
                         {currentRealtime ? currentRealtime.tmat_value.toFixed(2) : '—'} cm
                       </span>
@@ -187,9 +295,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     {t('dashboard:analytics.lastUpdated')}:
                   </p>
                   <p className="text-xs font-medium text-slate-700">
-                    {currentRealtime ? new Date(currentRealtime.timestamp_data).toLocaleString(
-                      isIndonesian ? 'id-ID' : 'en-US'
-                    ) : '-'}
+                    {formatTimestamp(lastUpdatedValue)}
                   </p>
                 </div>
               </div>
@@ -212,7 +318,16 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                   />
                 </svg>
                 {t('dashboard:analytics.historicalData')}
+                <span className="ml-2 text-[10px] font-medium text-slate-500">
+                  {historyStartDate} - {historyEndDate}
+                </span>
               </h4>
+
+              {!historyLoading && !historyError && (
+                <div className="mb-3 text-[11px] text-slate-500">
+                  Total records loaded: <span className="font-semibold text-slate-700">{historicalData.length}</span>
+                </div>
+              )}
 
               {historyLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -220,6 +335,12 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                   <span className="ml-2 text-sm text-slate-600">
                     {t('dashboard:analytics.loading')}
                   </span>
+                </div>
+              ) : historyError ? (
+                <div className="bg-red-50 rounded-lg border border-red-200 p-4 text-center">
+                  <p className="text-xs text-red-600 font-medium">
+                    {historyError.message}
+                  </p>
                 </div>
               ) : trendChartData.length > 0 ? (
                 <div className="bg-white rounded-lg border border-slate-100 p-4">
@@ -251,6 +372,26 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                 <div className="flex justify-between">
                   <span>{t('dashboard:analytics.province')}:</span>
                   <span className="font-medium text-slate-800">{selectedDevice.provinsi}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Provinsi ID:</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.provinsi_id || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Kabupaten ID:</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.kabupaten_id || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Kecamatan ID:</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.kecamatan_id || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Desa/Kelurahan:</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.desa || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Kelurahan ID:</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.kelurahan_id || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('dashboard:analytics.companyType')}:</span>

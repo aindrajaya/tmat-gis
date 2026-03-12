@@ -25,6 +25,11 @@ export interface Device {
   provinsi: string;
   kabupaten: string;
   kota: string;
+  desa?: string | null;
+  provinsi_id?: string | null;
+  kabupaten_id?: string | null;
+  kecamatan_id?: string | null;
+  kelurahan_id?: string | null;
   latitude: number;
   longitude: number;
   status: string;

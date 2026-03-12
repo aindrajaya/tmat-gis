@@ -40,19 +40,6 @@ const Login: React.FC = () => {
     );
   }
 
-  const provinceAccounts = [
-    { province: 'Jawa Timur', email: 'jatim@demo.mail', password: 'Jatim12345' },
-    { province: 'Jambi', email: 'jambi@demo.mail', password: 'Jambi12345' },
-    { province: 'Riau', email: 'riau@demo.mail', password: 'Riau12345' },
-    { province: 'Kalimantan Tengah', email: 'kalteng@demo.mail', password: 'Kalteng12345' },
-  ];
-
-  const companyAccounts = [
-    { company: 'PT. Sawit Jawa Timur 1', email: 'contact1@sawitjt.com', password: 'Perusahaan19' },
-    { company: 'PT. Sawit Kalimantan Tengah 1', email: 'contact6@sawitkt.com', password: 'Perusahaan24' },
-    { company: 'PT. Sawit Riau 1', email: 'contact16@sawitri.com', password: 'Perusahaan34' },
-  ];
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -147,7 +134,7 @@ const Login: React.FC = () => {
             {/* Email Field */}
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
-                {isIndonesian ? 'Email' : 'Email Address'}
+                {isIndonesian ? 'Email / Username' : 'Email / Username'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -155,11 +142,11 @@ const Login: React.FC = () => {
                 </div>
                 <input
                   id="email"
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                  placeholder={isIndonesian ? 'Masukkan email Anda' : 'Enter your email'}
+                  placeholder={isIndonesian ? 'Masukkan email atau username' : 'Enter email or username'}
                   required
                 />
               </div>
@@ -282,47 +269,25 @@ const Login: React.FC = () => {
             </div>
           </div>
 
-          {/* Province-scoped demo accounts */}
-          <div className="mt-4 bg-slate-50 rounded-lg p-3 border border-slate-200">
-            <p className="text-xs font-semibold text-slate-600 mb-2 text-center">
-              {isIndonesian ? 'Akun Provinsi (data terkunci per provinsi):' : 'Province Accounts (map data locked per province):'}
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <p className="text-xs text-slate-500 mb-2 font-semibold">
+              {isIndonesian ? 'Akun User Perusahaan:' : 'Company User Accounts:'}
             </p>
-            <div className="space-y-2">
-              {provinceAccounts.map((acc) => (
-                <div key={acc.email} className="p-2 rounded-md bg-white border border-slate-100">
-                  <p className="text-xs font-bold text-slate-800">{acc.province}</p>
-                  <p className="text-[11px] text-slate-600">
-                    Email: <code className="bg-slate-100 px-1 rounded">{acc.email}</code>
-                  </p>
-                  <p className="text-[11px] text-slate-600">
-                    Password: <code className="bg-slate-100 px-1 rounded">{acc.password}</code>
-                  </p>
-                </div>
-              ))}
+            <div className="bg-slate-50 rounded-lg p-3 space-y-1 text-xs text-slate-700">
+              <p><code className="bg-white px-1 rounded">superadminnsp</code> | nspmeranti@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admmujurlestari</code> | admmujurlestari@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admgrutilestaripratama</code> | admgrutilestaripratama@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">Sampoerna Agro</code> | superadmsampoernaagro@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admfajarpematangindahlestari</code> | admfajarpematangindahlestari@gmail.com</p>
+              <p><code className="bg-white px-1 rounded">admrambangagrojaya</code> | admrambangagrojaya@gmail.com</p>
+              <p className="pt-2 text-slate-500">
+                {isIndonesian
+                  ? 'Password default untuk user perusahaan mengikuti username.'
+                  : 'Default password for company users is the username.'}
+              </p>
             </div>
           </div>
 
-          {/* Company-scoped demo accounts */}
-          <div className="mt-4 bg-emerald-50 rounded-lg p-3 border border-emerald-100">
-            <p className="text-xs font-semibold text-emerald-700 mb-2 text-center">
-              {isIndonesian
-                ? 'Akun Perusahaan (hanya perangkat milik perusahaan terkait):'
-                : 'Company Accounts (only their own devices):'}
-            </p>
-            <div className="space-y-2">
-              {companyAccounts.map((acc) => (
-                <div key={acc.email} className="p-2 rounded-md bg-white border border-emerald-100">
-                  <p className="text-xs font-bold text-slate-800">{acc.company}</p>
-                  <p className="text-[11px] text-slate-600">
-                    Email: <code className="bg-emerald-50 px-1 rounded">{acc.email}</code>
-                  </p>
-                  <p className="text-[11px] text-slate-600">
-                    Password: <code className="bg-emerald-50 px-1 rounded">{acc.password}</code>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Footer */}

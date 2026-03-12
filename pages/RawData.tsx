@@ -4,7 +4,7 @@ import { Download, FileText, FileSpreadsheet, ChevronDown, Filter } from 'lucide
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { useRealtimeAll, useDevices } from '../services/useApi';
+import { useRealtimeAll, useDevices, usePerusahaan } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
 import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
@@ -34,8 +34,22 @@ const RawData: React.FC = () => {
   const { user } = useAuth();
   
   // Fetch data from API
-  const { data: realtimeData, loading, error, refetch } = useRealtimeAll(user?.perusahaanId || undefined);
-  const { data: devices } = useDevices(user?.perusahaanId || undefined);
+  const {
+    data: realtimeData,
+    loading: realtimeLoading,
+    error: realtimeError,
+    refetch,
+  } = useRealtimeAll(user?.perusahaanId || undefined);
+  const {
+    data: devices,
+    loading: devicesLoading,
+    error: devicesError,
+  } = useDevices(user?.perusahaanId || undefined);
+  const {
+    data: companies,
+    loading: companiesLoading,
+    error: companiesError,
+  } = usePerusahaan(user?.perusahaanId || undefined);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -43,12 +57,50 @@ const RawData: React.FC = () => {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const pageSize = 50;
 
+  const extractDatePart = (timestamp: unknown): string | null => {
+    if (typeof timestamp !== 'string') return null;
+    const value = timestamp.trim();
+    if (!value) return null;
+    if (value.includes(' ')) return value.split(' ')[0] || null;
+    if (value.includes('T')) return value.split('T')[0] || null;
+    return value.length >= 10 ? value.slice(0, 10) : null;
+  };
+
+  const toDayEpoch = (value: string): number | null => {
+    const parsed = new Date(value.includes(' ') ? value.replace(' ', 'T') : value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime();
+  };
+
+  const pickText = (record: Record<string, unknown>, keys: string[]): string => {
+    for (const key of keys) {
+      const value = record[key];
+      if (value !== undefined && value !== null) {
+        const normalized = String(value).trim();
+        if (normalized) return normalized;
+      }
+    }
+    return '';
+  };
+
+  const companyTypeById = useMemo(() => {
+    const map = new Map<number, string>();
+    (companies || []).forEach((company) => {
+      map.set(company.id, company.jenis_perusahaan);
+    });
+    return map;
+  }, [companies]);
+
   // Prepare table data: Join realtime with device info (memoized for performance)
   const tableData = useMemo(() => {
-    if (!realtimeData || !devices) return [];
+    if (!realtimeData) return [];
 
     // Create device lookup map for O(1) lookups instead of O(n) array searches
-    const deviceById = new Map(devices.map(d => [d.device_id_unik, d]));
+    const normalizeDeviceKey = (value: unknown) =>
+      String(value || '').trim().toUpperCase();
+    const deviceById = new Map(
+      (devices || []).map(d => [normalizeDeviceKey(d.device_id_unik), d])
+    );
 
     // Province gate: drop records outside enforced or selected province
     const targetProv = enforcedProvinsi || filters.provinsi;
@@ -57,24 +109,52 @@ const RawData: React.FC = () => {
       // Province filter
       .filter(rt => {
         if (!targetProv) return true;
-        const device = deviceById.get(rt.device_id_unik);
-        return device ? device.provinsi === targetProv : false;
+        const device = deviceById.get(normalizeDeviceKey(rt.device_id_unik));
+        const rtRaw = rt as unknown as Record<string, unknown>;
+        const realtimeProvinsi = pickText(rtRaw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
+        return device
+          ? device.provinsi === targetProv || String(device.provinsi_id || '') === String(targetProv)
+          : realtimeProvinsi === targetProv;
       })
       // Date range filter
       .filter(rt => {
         if (!filters.startDate && !filters.endDate) return true;
-        const dataDate = rt.timestamp_data.split(' ')[0]; // Extract YYYY-MM-DD
-        const matchesStart = !filters.startDate || dataDate >= filters.startDate;
-        const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
+        const dataDate = extractDatePart(rt.timestamp_data);
+        if (!dataDate) return true;
+
+        const dataEpoch = toDayEpoch(dataDate);
+        const startEpoch = filters.startDate ? toDayEpoch(filters.startDate) : null;
+        const endEpoch = filters.endDate ? toDayEpoch(filters.endDate) : null;
+
+        if (dataEpoch === null) return true;
+
+        const matchesStart = startEpoch === null || dataEpoch >= startEpoch;
+        const matchesEnd = endEpoch === null || dataEpoch <= endEpoch;
         return matchesStart && matchesEnd;
       })
       // Enrich with device data
       .map(rt => {
-        const device = deviceById.get(rt.device_id_unik);
+        const device = deviceById.get(normalizeDeviceKey(rt.device_id_unik));
+        const rtRaw = rt as unknown as Record<string, unknown>;
+        const realtimeProvinsi = pickText(rtRaw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
+        const realtimeKabupaten = pickText(rtRaw, ['kabupaten', 'regency', 'nama_kabupaten', 'kabupaten_id']);
+        const realtimeKecamatan = pickText(rtRaw, ['kecamatan', 'district', 'nama_kecamatan', 'kecamatan_id', 'kota', 'city']);
+        const realtimeDesa = pickText(rtRaw, ['desa', 'kelurahan', 'village', 'village_name', 'kelurahan_id']);
+        const resolvedProvinsi = device?.provinsi || realtimeProvinsi || '-';
+        const resolvedKabupaten = device?.kabupaten || realtimeKabupaten || '-';
+        const resolvedKecamatan = device?.kota || realtimeKecamatan || '-';
+        const resolvedDesa = device?.desa || realtimeDesa || '';
+        const resolvedAlamat = device?.alamat || pickText(rtRaw, ['alamat', 'address']) || '';
+
         return {
           ...rt,
           device: device,
-          location: device ? `${device.kota}, ${device.provinsi}` : 'Unknown'
+          resolvedProvinsi,
+          resolvedKabupaten,
+          resolvedKecamatan,
+          resolvedDesa,
+          resolvedAlamat,
+          location: `${resolvedKecamatan}, ${resolvedProvinsi}`,
         };
       });
   }, [realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
@@ -91,23 +171,38 @@ const RawData: React.FC = () => {
 
     return tableData.filter(row => {
       // Filter by kabupaten (city)
-      if (filters.kabupaten && row.device?.kabupaten !== filters.kabupaten) {
+      if (filters.kabupaten && row.resolvedKabupaten !== filters.kabupaten) {
         return false;
       }
 
       // Filter by kecamatan
-      if (filters.kecamatan && row.device?.kota !== filters.kecamatan) {
+      if (filters.kecamatan && row.resolvedKecamatan !== filters.kecamatan) {
         return false;
       }
 
       // Filter by desa
-      if (filters.desa && !(row.device?.alamat?.toLowerCase().includes(filters.desa.toLowerCase()))) {
+      if (
+        filters.desa &&
+        !(
+          row.resolvedDesa?.toLowerCase().includes(filters.desa.toLowerCase()) ||
+          row.resolvedAlamat?.toLowerCase().includes(filters.desa.toLowerCase())
+        )
+      ) {
         return false;
       }
 
       // Filter by company type
-      if (filters.jenis_perusahaan && row.device?.id_perusahaan.toString() !== filters.jenis_perusahaan) {
-        return false;
+      if (filters.jenis_perusahaan) {
+        if (companyTypeById.size === 0) {
+          // Company master not ready yet; don't drop all rows.
+          return true;
+        }
+        const companyType = row.device?.id_perusahaan
+          ? companyTypeById.get(Number(row.device.id_perusahaan))
+          : undefined;
+        if (!companyType || companyType !== filters.jenis_perusahaan) {
+          return false;
+        }
       }
 
       // Apply search filter
@@ -115,9 +210,9 @@ const RawData: React.FC = () => {
         const searchLower = filters.searchText.toLowerCase();
         const matchesId = row.device_id_unik.toLowerCase().includes(searchLower);
         const matchesLocation = row.location.toLowerCase().includes(searchLower);
-        const matchesKota = row.device?.kota?.toLowerCase().includes(searchLower);
-        const matchesProvinsi = row.device?.provinsi?.toLowerCase().includes(searchLower);
-        const matchesAlamat = row.device?.alamat?.toLowerCase().includes(searchLower);
+        const matchesKota = row.resolvedKecamatan?.toLowerCase().includes(searchLower);
+        const matchesProvinsi = row.resolvedProvinsi?.toLowerCase().includes(searchLower);
+        const matchesAlamat = row.resolvedAlamat?.toLowerCase().includes(searchLower);
         
         if (!(matchesId || matchesLocation || matchesKota || matchesProvinsi || matchesAlamat)) {
           return false;
@@ -126,7 +221,7 @@ const RawData: React.FC = () => {
 
       return true;
     });
-  }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText]);
+  }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText, companyTypeById]);
 
   // Paginate table data (memoized to avoid unnecessary slice operations)
   const paginatedData = useMemo(() => {
@@ -140,6 +235,28 @@ const RawData: React.FC = () => {
   const totalPages = useMemo(() => {
     return Math.ceil(filteredData.length / pageSize);
   }, [filteredData.length, pageSize]);
+
+  useEffect(() => {
+    const sampleDates = (realtimeData || []).slice(0, 5).map((r) => r.timestamp_data);
+    console.log('[RawData] data pipeline', {
+      realtimeRows: realtimeData?.length || 0,
+      devices: devices?.length || 0,
+      companies: companies?.length || 0,
+      tableData: tableData.length,
+      filteredData: filteredData.length,
+      sampleRealtimeDates: sampleDates,
+      activeFilters: {
+        provinsi: filters.provinsi,
+        kabupaten: filters.kabupaten,
+        kecamatan: filters.kecamatan,
+        desa: filters.desa,
+        jenis_perusahaan: filters.jenis_perusahaan,
+        searchText: filters.searchText,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      },
+    });
+  }, [realtimeData, devices, companies, tableData.length, filteredData.length, filters]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -302,6 +419,10 @@ const RawData: React.FC = () => {
     setShowExportMenu(false);
   }, [filteredData]);
 
+  const loading = realtimeLoading;
+  const error = realtimeError;
+  const nonFatalWarnings = [devicesError?.message, companiesError?.message].filter(Boolean);
+
   // Handle loading state
   if (loading) {
     return (
@@ -336,6 +457,14 @@ const RawData: React.FC = () => {
 
   return (
     <div className="p-6">
+      {nonFatalWarnings.length > 0 && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <h3 className="font-semibold text-amber-800 mb-1">Sebagian data referensi gagal dimuat</h3>
+          <p className="text-sm text-amber-700">
+            Telemetri tetap ditampilkan dari endpoint realtime. Detail lokasi/perusahaan mungkin belum lengkap.
+          </p>
+        </div>
+      )}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <h2 className="font-bold text-slate-800">{t('tables:rawData.title')}</h2>

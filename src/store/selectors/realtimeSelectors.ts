@@ -25,7 +25,7 @@ export const selectAllRealtimeData = createSelector(
  */
 export const selectRealtimeLoading = createSelector(
   [selectRealtimeState],
-  (realtime) => realtime.loading
+  (realtime) => realtime.isLoading
 );
 
 /**

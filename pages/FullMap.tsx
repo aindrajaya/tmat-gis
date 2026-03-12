@@ -54,6 +54,9 @@ const FullMap: React.FC = () => {
     if (!allDevices) return [];
 
     let filtered = allDevices;
+    if (user?.role === 'perusahaan' && user?.perusahaanId) {
+      filtered = filtered.filter((d) => d.id_perusahaan === user.perusahaanId);
+    }
     if (filters.provinsi) {
       filtered = filtered.filter((d) => d.provinsi === filters.provinsi);
     }
@@ -67,7 +70,7 @@ const FullMap: React.FC = () => {
       filtered = filtered.filter((d) => companyIds.includes(d.id_perusahaan));
     }
     return filtered;
-  }, [allDevices, allPerusahaan, filters]);
+  }, [allDevices, allPerusahaan, filters, user?.role, user?.perusahaanId]);
 
   // Realtime data scoped to filtered devices and date range
   const relevantRealtimeData = useMemo(() => {
@@ -82,8 +85,20 @@ const FullMap: React.FC = () => {
     
     const deviceIds = new Set(scopedDevices.map((d) => d.device_id_unik));
 
+    // Check if we're on the public /map route
+    const isPublicMapRoute = typeof window !== 'undefined' && (
+      window.location.hash === '#/map' ||
+      window.location.hash.startsWith('#/map?') ||
+      window.location.hash.startsWith('#/map/')
+    );
+
     return realtimeData.filter((r) => {
       if (!deviceIds.has(r.device_id_unik)) return false;
+      
+      // Skip date filtering on public /map route to show all available data
+      if (isPublicMapRoute) return true;
+      
+      // Apply date filters on other routes
       const dataDate = r.timestamp_data.split(' ')[0];
       const matchesStart = !filters.startDate || dataDate >= filters.startDate;
       const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
@@ -94,12 +109,12 @@ const FullMap: React.FC = () => {
   // Daily chart data
   const dailyChartData = useMemo(() => {
     if (relevantRealtimeData.length === 0) return [];
-    const dailyAggregation: Record<string, { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
+    const dailyAggregation: Record<string, { offline: number; safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
 
     relevantRealtimeData.forEach((r: RealtimeData) => {
       const date = r.timestamp_data.split(' ')[0];
       if (!dailyAggregation[date]) {
-        dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
+        dailyAggregation[date] = { offline: 0, safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
       }
 
       if (r.tmat_value < -0.6) {
@@ -125,13 +140,13 @@ const FullMap: React.FC = () => {
   // Weekly chart data
   const weeklyChartData = useMemo(() => {
     if (relevantRealtimeData.length === 0) return [];
-    const weeklyAggregation: Record<string, { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
+    const weeklyAggregation: Record<string, { offline: number; safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
 
     relevantRealtimeData.forEach((r: RealtimeData) => {
       const date = r.timestamp_data.split(' ')[0];
       const weekStart = getWeekStart(date);
       if (!weeklyAggregation[weekStart]) {
-        weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
+        weeklyAggregation[weekStart] = { offline: 0, safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
       }
 
       if (r.tmat_value < -0.6) {

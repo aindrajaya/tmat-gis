@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFilters } from '../context/FilterContext';
-import { useDevices } from '../services/useApi';
+import { useDevices, useRealtimeAll } from '../services/useApi';
 import { useAuth } from '../context/AuthContext';
 import { Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
 
@@ -11,7 +11,19 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
   const { filters, updateFilter, setTimePeriod, resetFilters, enforcedProvinsi } = useFilters();
   const { user } = useAuth();
   const { data: devices } = useDevices(user?.perusahaanId || undefined);
+  const { data: realtimeData } = useRealtimeAll(user?.perusahaanId || undefined);
   const [activeTab, setActiveTab] = useState<'location' | 'date' | 'search'>('location');
+
+  const pickText = (record: Record<string, unknown>, keys: string[]): string => {
+    for (const key of keys) {
+      const value = record[key];
+      if (value !== undefined && value !== null) {
+        const normalized = String(value).trim();
+        if (normalized) return normalized;
+      }
+    }
+    return '';
+  };
 
   const handlePresetClick = (period: 'today' | '7d' | '14d' | '30d') => {
     setTimePeriod(period);
@@ -19,23 +31,24 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
 
   // Get unique provinces from devices data
   const provinceOptions = useMemo(() => {
-    if (!devices) return [];
     const provinces = new Set<string>();
-    devices.forEach(device => {
-      if (device.provinsi) {
-        provinces.add(device.provinsi);
-      }
+    (devices || []).forEach(device => {
+      if (device.provinsi) provinces.add(device.provinsi);
+    });
+    (realtimeData || []).forEach(rt => {
+      const raw = rt as unknown as Record<string, unknown>;
+      const prov = pickText(raw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
+      if (prov) provinces.add(prov);
     });
     return Array.from(provinces).sort();
-  }, [devices]);
+  }, [devices, realtimeData]);
 
   // Get kabupaten/kota - show all when no province selected, filtered when province is selected
   const kabupatenOptions = useMemo(() => {
-    if (!devices) return [];
     const targetProv = enforcedProvinsi || filters.provinsi;
     
     const kabupaten = new Set<string>();
-    devices.forEach(device => {
+    (devices || []).forEach(device => {
       // If there's a target province, filter by it; otherwise show all
       if (targetProv) {
         if (device.provinsi === targetProv && device.kabupaten) {
@@ -47,33 +60,60 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
         }
       }
     });
+    (realtimeData || []).forEach(rt => {
+      const raw = rt as unknown as Record<string, unknown>;
+      const prov = pickText(raw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
+      const kab = pickText(raw, ['kabupaten', 'regency', 'nama_kabupaten', 'kabupaten_id']);
+      if (!kab) return;
+      if (targetProv) {
+        if (prov === targetProv) kabupaten.add(kab);
+      } else {
+        kabupaten.add(kab);
+      }
+    });
     return Array.from(kabupaten).sort();
-  }, [devices, filters.provinsi, enforcedProvinsi]);
+  }, [devices, realtimeData, filters.provinsi, enforcedProvinsi]);
 
   // Get kecamatan filtered by selected kabupaten
   const kecamatanOptions = useMemo(() => {
-    if (!devices || !filters.kabupaten) return [];
+    if (!filters.kabupaten) return [];
     const kecamatan = new Set<string>();
-    devices.forEach(device => {
+    (devices || []).forEach(device => {
       if (device.kabupaten === filters.kabupaten && device.kota) {
         kecamatan.add(device.kota);
       }
     });
+    (realtimeData || []).forEach(rt => {
+      const raw = rt as unknown as Record<string, unknown>;
+      const kab = pickText(raw, ['kabupaten', 'regency', 'nama_kabupaten', 'kabupaten_id']);
+      const kec = pickText(raw, ['kecamatan', 'district', 'nama_kecamatan', 'kecamatan_id', 'kota', 'city']);
+      if (kab === filters.kabupaten && kec) {
+        kecamatan.add(kec);
+      }
+    });
     return Array.from(kecamatan).sort();
-  }, [devices, filters.kabupaten]);
+  }, [devices, realtimeData, filters.kabupaten]);
 
   // Get desa filtered by selected kecamatan
   const desaOptions = useMemo(() => {
-    if (!devices || !filters.kecamatan) return [];
+    if (!filters.kecamatan) return [];
     const desa = new Set<string>();
-    devices.forEach(device => {
-      if (device.kota === filters.kecamatan && device.alamat) {
-        // Extract village name from address (assuming it's part of the address field)
-        desa.add(device.alamat);
+    (devices || []).forEach(device => {
+      if (device.kota === filters.kecamatan) {
+        if (device.desa) desa.add(device.desa);
+        if (device.alamat) desa.add(device.alamat);
+      }
+    });
+    (realtimeData || []).forEach(rt => {
+      const raw = rt as unknown as Record<string, unknown>;
+      const kec = pickText(raw, ['kecamatan', 'district', 'nama_kecamatan', 'kecamatan_id', 'kota', 'city']);
+      const des = pickText(raw, ['desa', 'kelurahan', 'village', 'village_name', 'kelurahan_id', 'alamat', 'address']);
+      if (kec === filters.kecamatan && des) {
+        desa.add(des);
       }
     });
     return Array.from(desa).sort();
-  }, [devices, filters.kecamatan]);
+  }, [devices, realtimeData, filters.kecamatan]);
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTimePeriod('custom');

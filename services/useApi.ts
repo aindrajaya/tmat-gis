@@ -6,7 +6,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getAPIClient, APIClient } from './apiClient';
 import { Device, Perusahaan, RealtimeData } from '../types';
-import { MOCK_REALTIME } from './mockData';
 
 export interface UseApiState<T> {
   data: T | null;
@@ -149,7 +148,8 @@ export function useRealtimeDevice(
   startDate: string,
   endDate: string,
   limit: number = 100,
-  offset: number = 0
+  offset: number = 0,
+  perusahaanId?: number
 ) {
   const [state, setState] = useState<UseApiState<RealtimeData[]>>({
     data: null,
@@ -165,16 +165,15 @@ export function useRealtimeDevice(
 
     setState({ data: null, loading: true, error: null });
     try {
-      // Return mock data filtered by device - no date filtering for development/demo purposes
-      const filtered = MOCK_REALTIME
-        .filter(r => r.device_id_unik === deviceId)
-        .sort((a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime()); // Ascending order for charts
-
-      // apply offset/limit
-      const result = filtered.slice(offset, offset + limit);
-
-      // simulate async API delay
-      await new Promise((res) => setTimeout(res, 200));
+      const client = getAPIClient();
+      const result = await client.getRealtimeDevice(
+        deviceId,
+        startDate,
+        endDate,
+        limit,
+        offset,
+        perusahaanId
+      );
       setState({ data: result, loading: false, error: null });
     } catch (error) {
       setState({
@@ -183,7 +182,7 @@ export function useRealtimeDevice(
         error: error instanceof Error ? error : new Error(String(error)),
       });
     }
-  }, [deviceId, limit, offset]);
+  }, [deviceId, startDate, endDate, limit, offset, perusahaanId]);
 
   // Auto-fetch on mount and when dependencies change
   useEffect(() => {

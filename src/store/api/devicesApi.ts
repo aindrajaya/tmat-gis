@@ -6,6 +6,8 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseFetchQuery } from './baseApi';
 import { Device, Perusahaan } from '../../types';
+import { getAPIClient } from '../../../services/apiClient';
+import { getScopedPerusahaanId, toRtkQueryError } from './runtimeScope';
 
 export const devicesApi = createApi({
   reducerPath: 'devicesApi',
@@ -18,10 +20,16 @@ export const devicesApi = createApi({
      * Cache for 1 hour - master data changes rarely
      */
     getAllDevices: builder.query<Device[], number | undefined>({
-      query: (perusahaanId) => ({
-        url: '/device',
-        params: perusahaanId ? { perusahaanId } : undefined,
-      }),
+      queryFn: async (perusahaanId) => {
+        try {
+          const client = getAPIClient();
+          const scopedPerusahaanId = getScopedPerusahaanId(perusahaanId);
+          const data = await client.getDevice(undefined, scopedPerusahaanId);
+          return { data };
+        } catch (error) {
+          return { error: toRtkQueryError(error) };
+        }
+      },
       keepUnusedDataFor: 3600, // 1 hour
       providesTags: ['Devices'],
     }),
@@ -30,9 +38,20 @@ export const devicesApi = createApi({
      * Get specific device
      */
     getDevice: builder.query<Device | null, string>({
-      query: (deviceId) => ({
-        url: `/device/${deviceId}`,
-      }),
+      queryFn: async (deviceId) => {
+        try {
+          const client = getAPIClient();
+          const scopedPerusahaanId = getScopedPerusahaanId();
+          const data = await client.getDeviceById(deviceId, scopedPerusahaanId);
+          return { data };
+        } catch (error) {
+          // Keep backward compatibility with old endpoint contract that may return null.
+          if (error instanceof Error && /not found/i.test(error.message)) {
+            return { data: null };
+          }
+          return { error: toRtkQueryError(error) };
+        }
+      },
       keepUnusedDataFor: 3600,
       providesTags: ['Devices'],
     }),
@@ -41,10 +60,16 @@ export const devicesApi = createApi({
      * Get all companies
      */
     getAllCompanies: builder.query<Perusahaan[], number | undefined>({
-      query: (perusahaanId) => ({
-        url: '/perusahaan',
-        params: perusahaanId ? { perusahaanId } : undefined,
-      }),
+      queryFn: async (perusahaanId) => {
+        try {
+          const client = getAPIClient();
+          const scopedPerusahaanId = getScopedPerusahaanId(perusahaanId);
+          const data = await client.getPerusahaan(scopedPerusahaanId);
+          return { data };
+        } catch (error) {
+          return { error: toRtkQueryError(error) };
+        }
+      },
       keepUnusedDataFor: 3600,
       providesTags: ['Companies'],
     }),
@@ -60,9 +85,27 @@ export const devicesApi = createApi({
       },
       void
     >({
-      query: () => ({
-        url: '/locations',
-      }),
+      queryFn: async () => {
+        try {
+          const client = getAPIClient();
+          const scopedPerusahaanId = getScopedPerusahaanId();
+          const devices = await client.getDevice(undefined, scopedPerusahaanId);
+          const provinsi = [...new Set(devices.map((d) => d.provinsi).filter(Boolean))].sort();
+          const kabupaten = [...new Set(devices.map((d) => d.kabupaten).filter(Boolean))].sort();
+          // Existing UI maps "kecamatan" to device.kota in this codebase.
+          const kecamatan = [...new Set(devices.map((d) => d.kota).filter(Boolean))].sort();
+
+          return {
+            data: {
+              provinsi,
+              kabupaten,
+              kecamatan,
+            },
+          };
+        } catch (error) {
+          return { error: toRtkQueryError(error) };
+        }
+      },
       keepUnusedDataFor: 3600,
       providesTags: ['Locations'],
     }),
@@ -71,9 +114,17 @@ export const devicesApi = createApi({
      * Get provinces
      */
     getProvinces: builder.query<string[], void>({
-      query: () => ({
-        url: '/locations/provinces',
-      }),
+      queryFn: async () => {
+        try {
+          const client = getAPIClient();
+          const scopedPerusahaanId = getScopedPerusahaanId();
+          const devices = await client.getDevice(undefined, scopedPerusahaanId);
+          const data = [...new Set(devices.map((d) => d.provinsi).filter(Boolean))].sort();
+          return { data };
+        } catch (error) {
+          return { error: toRtkQueryError(error) };
+        }
+      },
       keepUnusedDataFor: 3600,
       providesTags: ['Locations'],
     }),
@@ -82,10 +133,24 @@ export const devicesApi = createApi({
      * Get regencies by province
      */
     getRegencies: builder.query<string[], string>({
-      query: (province) => ({
-        url: `/locations/regencies`,
-        params: { province },
-      }),
+      queryFn: async (province) => {
+        try {
+          const client = getAPIClient();
+          const scopedPerusahaanId = getScopedPerusahaanId();
+          const devices = await client.getDevice(undefined, scopedPerusahaanId);
+          const data = [
+            ...new Set(
+              devices
+                .filter((d) => d.provinsi === province)
+                .map((d) => d.kabupaten)
+                .filter(Boolean)
+            ),
+          ].sort();
+          return { data };
+        } catch (error) {
+          return { error: toRtkQueryError(error) };
+        }
+      },
       keepUnusedDataFor: 3600,
       providesTags: ['Locations'],
     }),
@@ -97,10 +162,26 @@ export const devicesApi = createApi({
       string[],
       { province: string; regency: string }
     >({
-      query: ({ province, regency }) => ({
-        url: `/locations/districts`,
-        params: { province, regency },
-      }),
+      queryFn: async ({ province, regency }) => {
+        try {
+          const client = getAPIClient();
+          const scopedPerusahaanId = getScopedPerusahaanId();
+          const devices = await client.getDevice(undefined, scopedPerusahaanId);
+          const data = [
+            ...new Set(
+              devices
+                .filter(
+                  (d) => d.provinsi === province && d.kabupaten === regency
+                )
+                .map((d) => d.kota)
+                .filter(Boolean)
+            ),
+          ].sort();
+          return { data };
+        } catch (error) {
+          return { error: toRtkQueryError(error) };
+        }
+      },
       keepUnusedDataFor: 3600,
       providesTags: ['Locations'],
     }),

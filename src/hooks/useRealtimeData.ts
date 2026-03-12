@@ -84,7 +84,7 @@ export const useRefreshRealtimeData = () => {
   return {
     refresh: () => {
       // Trigger RTK Query refetch by invalidating cache
-      dispatch(realtimeApi.util.invalidateTags(['RealtimeData']));
+      dispatch(realtimeApi.util.invalidateTags(['Realtime']));
     },
   };
 };

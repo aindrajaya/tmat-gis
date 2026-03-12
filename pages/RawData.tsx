@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, FileSpreadsheet, ChevronDown, Filter } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, ChevronDown, Filter, RefreshCw } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { useRealtimeAll, useDevices, usePerusahaan } from '../services/useApi';
+import { useRealtimeAll, useDevices, usePerusahaan, useHistoricalDataAllChunks } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
 
 // Memoized table row component to prevent unnecessary re-renders
@@ -32,14 +33,17 @@ const RawData: React.FC = () => {
   const { t } = useTranslation();
   const { filters, enforcedProvinsi } = useFilters();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
-  // Fetch data from API
+  // Fetch realtime snapshot (latest data)
   const {
     data: realtimeData,
     loading: realtimeLoading,
     error: realtimeError,
     refetch,
   } = useRealtimeAll(user?.perusahaanId || undefined);
+  
+  // Fetch device and company master data
   const {
     data: devices,
     loading: devicesLoading,
@@ -50,12 +54,61 @@ const RawData: React.FC = () => {
     loading: companiesLoading,
     error: companiesError,
   } = usePerusahaan(user?.perusahaanId || undefined);
+
+  // Determine if we should use historical mode
+  const isHistoricalMode = !!(filters.startDate && filters.endDate);
+
+  // Filter devices before fetching historical data
+  const filteredDevices = useMemo(() => {
+    if (!devices) return [];
+    
+    const targetProv = enforcedProvinsi || filters.provinsi;
+    
+    return devices.filter(device => {
+      // Province filter
+      if (targetProv && device.provinsi !== targetProv) {
+        return false;
+      }
+      
+      // Kabupaten filter
+      if (filters.kabupaten && device.kabupaten !== filters.kabupaten) {
+        return false;
+      }
+      
+      // Kecamatan filter
+      if (filters.kecamatan && device.kota !== filters.kecamatan) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [devices, enforcedProvinsi, filters.provinsi, filters.kabupaten, filters.kecamatan]);
+
+  // Fetch historical data for all chunks (sequential)
+  const historicalData = useHistoricalDataAllChunks(
+    filteredDevices,
+    filters.startDate || '',
+    filters.endDate || '',
+    user?.perusahaanId,
+    isHistoricalMode
+  );
   
   const [currentPage, setCurrentPage] = useState(1);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const pageSize = 50;
+
+  // Manual refresh function to invalidate cache
+  const handleRefresh = useCallback(() => {
+    if (isHistoricalMode) {
+      // Invalidate all historical chunk queries
+      queryClient.invalidateQueries({ queryKey: ['historical-chunk'] });
+    } else {
+      // Refresh realtime data
+      refetch();
+    }
+  }, [isHistoricalMode, queryClient, refetch]);
 
   const extractDatePart = (timestamp: unknown): string | null => {
     if (typeof timestamp !== 'string') return null;
@@ -91,9 +144,12 @@ const RawData: React.FC = () => {
     return map;
   }, [companies]);
 
-  // Prepare table data: Join realtime with device info (memoized for performance)
+  // Prepare table data: Join realtime/historical with device info (memoized for performance)
   const tableData = useMemo(() => {
-    if (!realtimeData) return [];
+    // Choose data source based on mode
+    const sourceData = isHistoricalMode ? historicalData.data : (realtimeData || []);
+    
+    if (!sourceData || sourceData.length === 0) return [];
 
     // Create device lookup map for O(1) lookups instead of O(n) array searches
     const normalizeDeviceKey = (value: unknown) =>
@@ -105,9 +161,10 @@ const RawData: React.FC = () => {
     // Province gate: drop records outside enforced or selected province
     const targetProv = enforcedProvinsi || filters.provinsi;
     
-    return realtimeData
-      // Province filter
+    return sourceData
+      // Province filter (only for realtime mode - historical already filtered via devices)
       .filter(rt => {
+        if (isHistoricalMode) return true; // Already filtered by device selection
         if (!targetProv) return true;
         const device = deviceById.get(normalizeDeviceKey(rt.device_id_unik));
         const rtRaw = rt as unknown as Record<string, unknown>;
@@ -116,8 +173,9 @@ const RawData: React.FC = () => {
           ? device.provinsi === targetProv || String(device.provinsi_id || '') === String(targetProv)
           : realtimeProvinsi === targetProv;
       })
-      // Date range filter
+      // Date range filter (only for realtime mode - historical fetch already handles this)
       .filter(rt => {
+        if (isHistoricalMode) return true; // Historical data already filtered by date range
         if (!filters.startDate && !filters.endDate) return true;
         const dataDate = extractDatePart(rt.timestamp_data);
         if (!dataDate) return true;
@@ -157,7 +215,7 @@ const RawData: React.FC = () => {
           location: `${resolvedKecamatan}, ${resolvedProvinsi}`,
         };
       });
-  }, [realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
+  }, [isHistoricalMode, historicalData.data, realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
 
   // Reset to first page when base table data changes
   useEffect(() => {
@@ -223,18 +281,26 @@ const RawData: React.FC = () => {
     });
   }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText, companyTypeById]);
 
+  // Display limit: max 10,000 rows in table (full data available via export)
+  const MAX_DISPLAY_ROWS = 10000;
+  const displayData = useMemo(() => {
+    return filteredData.slice(0, MAX_DISPLAY_ROWS);
+  }, [filteredData]);
+
+  const isDataLimited = filteredData.length > MAX_DISPLAY_ROWS;
+
   // Paginate table data (memoized to avoid unnecessary slice operations)
   const paginatedData = useMemo(() => {
-    return filteredData.slice(
+    return displayData.slice(
       (currentPage - 1) * pageSize,
       currentPage * pageSize
     );
-  }, [filteredData, currentPage, pageSize]);
+  }, [displayData, currentPage, pageSize]);
 
-  // Calculate total pages (memoized)
+  // Calculate total pages (memoized) - based on display data, not full filtered data
   const totalPages = useMemo(() => {
-    return Math.ceil(filteredData.length / pageSize);
-  }, [filteredData.length, pageSize]);
+    return Math.ceil(displayData.length / pageSize);
+  }, [displayData.length, pageSize]);
 
   useEffect(() => {
     const sampleDates = (realtimeData || []).slice(0, 5).map((r) => r.timestamp_data);
@@ -419,12 +485,13 @@ const RawData: React.FC = () => {
     setShowExportMenu(false);
   }, [filteredData]);
 
-  const loading = realtimeLoading;
-  const error = realtimeError;
+  const loading = isHistoricalMode ? historicalData.isLoading : realtimeLoading;
+  const error = isHistoricalMode ? historicalData.error : realtimeError;
   const nonFatalWarnings = [devicesError?.message, companiesError?.message].filter(Boolean);
 
   // Handle loading state
-  if (loading) {
+  if (loading && !isHistoricalMode) {
+    // Only show full-page loading for realtime mode initial load
     return (
       <div className="p-6">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
@@ -437,15 +504,15 @@ const RawData: React.FC = () => {
     );
   }
 
-  // Handle error state
-  if (error) {
+  // Handle error state (only for critical errors in realtime mode)
+  if (error && !isHistoricalMode) {
     return (
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
           <h3 className="font-bold text-red-800 mb-2">Error loading data</h3>
           <p className="text-red-600 mb-4">{error.message}</p>
           <button 
-            onClick={refetch}
+            onClick={handleRefresh}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
           >
             Retry
@@ -465,17 +532,94 @@ const RawData: React.FC = () => {
           </p>
         </div>
       )}
+
+      {/* Historical Mode Progress Indicator */}
+      {isHistoricalMode && historicalData.isLoading && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <div className="flex-1">
+              <p className="font-semibold text-blue-900">
+                Loading chunk {historicalData.chunkProgress.current}/{historicalData.chunkProgress.total}
+                {historicalData.currentChunkRange && (
+                  <span className="font-normal text-blue-700 ml-2">
+                    ({historicalData.currentChunkRange.start} to {historicalData.currentChunkRange.end})
+                  </span>
+                )}
+              </p>
+              <p className="text-sm text-blue-600 mt-1">
+                {historicalData.data.length.toLocaleString()} records loaded so far...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Historical Mode Error (non-blocking) */}
+      {isHistoricalMode && historicalData.error && !historicalData.isLoading && (
+        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-xl p-4">
+          <h3 className="font-semibold text-orange-800 mb-1">Partial Data Loaded</h3>
+          <p className="text-sm text-orange-700">
+            Some chunks failed to load. Showing {historicalData.data.length.toLocaleString()} records from successful chunks.
+          </p>
+        </div>
+      )}
+
+      {/* 10K Row Display Limit Warning */}
+      {isDataLimited && (
+        <div className="mb-4 bg-purple-50 border border-purple-200 rounded-xl p-4">
+          <h3 className="font-semibold text-purple-800 mb-1">
+            {t('tables:rawData.displayLimit.title', {
+              displayed: MAX_DISPLAY_ROWS.toLocaleString(),
+              total: filteredData.length.toLocaleString()
+            })}
+          </h3>
+          <p className="text-sm text-purple-700" dangerouslySetInnerHTML={{
+            __html: t('tables:rawData.displayLimit.description', {
+              limit: MAX_DISPLAY_ROWS.toLocaleString(),
+              total: filteredData.length.toLocaleString()
+            })
+          }} />
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h2 className="font-bold text-slate-800">{t('tables:rawData.title')}</h2>
-          <div className="relative" ref={exportMenuRef}>
+          <div className="flex items-center gap-3">
+            <h2 className="font-bold text-slate-800">{t('tables:rawData.title')}</h2>
+            
+            {/* Data Mode Badge */}
+            {isHistoricalMode ? (
+              <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                Historical Mode ({historicalData.chunkProgress.total} chunks)
+              </span>
+            ) : (
+              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                Realtime Snapshot
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Refresh Button */}
             <button 
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              className="text-sm font-medium flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition"
+              onClick={handleRefresh}
+              disabled={loading}
+              className="text-sm font-medium flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+              title="Refresh data"
             >
-              <Download size={16} />
-              {t('common:buttons.exportCsv')}
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
+
+            {/* Export Menu */}
+            <div className="relative" ref={exportMenuRef}>
+              <button 
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="text-sm font-medium flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition"
+              >
+                <Download size={16} />
+                {t('common:buttons.exportCsv')}
+              </button>
 
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
@@ -506,6 +650,7 @@ const RawData: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
         </div>
         
         {/* Filter Section */}
@@ -558,7 +703,12 @@ const RawData: React.FC = () => {
         {/* Pagination Controls */}
         <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center">
           <span className="text-xs text-slate-500">
-            Showing {paginatedData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}-{Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} records
+            Showing {paginatedData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}-{Math.min(currentPage * pageSize, displayData.length)} of {displayData.length.toLocaleString()} records
+            {isDataLimited && (
+              <span className="text-purple-600 font-semibold ml-1">
+                (limited from {filteredData.length.toLocaleString()} total)
+              </span>
+            )}
           </span>
           <div className="flex gap-2">
             <button

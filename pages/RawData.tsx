@@ -62,9 +62,16 @@ const RawData: React.FC = () => {
   const filteredDevices = useMemo(() => {
     if (!devices) return [];
     
+    let filtered = devices;
+    
+    // Company user filter: only show devices owned by user's company
+    if (user?.role === 'perusahaan' && user?.perusahaanId) {
+      filtered = filtered.filter(device => device.id_perusahaan === user.perusahaanId);
+    }
+    
     const targetProv = enforcedProvinsi || filters.provinsi;
     
-    return devices.filter(device => {
+    return filtered.filter(device => {
       // Province filter
       if (targetProv && device.provinsi !== targetProv) {
         return false;
@@ -82,7 +89,7 @@ const RawData: React.FC = () => {
       
       return true;
     });
-  }, [devices, enforcedProvinsi, filters.provinsi, filters.kabupaten, filters.kecamatan]);
+  }, [devices, enforcedProvinsi, filters.provinsi, filters.kabupaten, filters.kecamatan, user]);
 
   // Fetch historical data for all chunks (sequential)
   const historicalData = useHistoricalDataAllChunks(
@@ -228,6 +235,13 @@ const RawData: React.FC = () => {
     if (!tableData || tableData.length === 0) return [];
 
     return tableData.filter(row => {
+      // Company user filter: only show data from user's company devices (defense-in-depth)
+      if (user?.role === 'perusahaan' && user?.perusahaanId) {
+        if (row.device?.id_perusahaan !== user.perusahaanId) {
+          return false;
+        }
+      }
+
       // Filter by kabupaten (city)
       if (filters.kabupaten && row.resolvedKabupaten !== filters.kabupaten) {
         return false;
@@ -279,7 +293,7 @@ const RawData: React.FC = () => {
 
       return true;
     });
-  }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText, companyTypeById]);
+  }, [tableData, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan, filters.searchText, companyTypeById, user]);
 
   // Display limit: max 10,000 rows in table (full data available via export)
   const MAX_DISPLAY_ROWS = 10000;

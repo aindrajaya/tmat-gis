@@ -9,6 +9,10 @@
       "temperature": "Suhu (°C)",
       "ph": "pH"
     },
-    "pagination": "Menampilkan X catatan"
+    "pagination": "Menampilkan X catatan",
+    "displayLimit": {
+      "title": "Menampilkan {{displayed}} dari {{total}} data pertama",
+      "description": "Tampilan tabel dibatasi {{limit}} baris untuk performa. Gunakan <strong>Export (CSV/Excel)</strong> untuk mengunduh dataset lengkap dengan semua {{total}} data."
+    }
   }
 }

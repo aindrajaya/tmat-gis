@@ -9,6 +9,10 @@
       "temperature": "Temp (°C)",
       "ph": "pH"
     },
-    "pagination": "Showing X records"
+    "pagination": "Showing X records",
+    "displayLimit": {
+      "title": "Showing first {{displayed}} of {{total}} records",
+      "description": "Table view limited to {{limit}} rows for performance. Use <strong>Export (CSV/Excel)</strong> to download the complete dataset with all {{total}} records."
+    }
   }
 }

@@ -37,6 +37,21 @@ const Dashboard: React.FC = () => {
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState<Error | null>(null);
 
+  const normalizeRegionValue = (value?: string | null): string => {
+    return (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const matchesRegionFilter = (filterValue: string, ...candidates: Array<string | null | undefined>): boolean => {
+    if (!filterValue) return true;
+    const target = normalizeRegionValue(filterValue);
+    return candidates.some((candidate) => normalizeRegionValue(candidate || '') === target);
+  };
+
   // Helper function to get week start date (Monday)
   const getWeekStart = (date: string): string => {
     const d = new Date(date + 'T00:00:00');
@@ -160,25 +175,60 @@ const Dashboard: React.FC = () => {
   );
 
   const filteredDevices = useMemo(() => {
-    if (!allDevices) return [];
+    console.log('[Dashboard] useMemo filteredDevices recalculating...');
+    console.log('[Dashboard] allDevices:', allDevices);
+    console.log('[Dashboard] allDevices type:', typeof allDevices);
+    console.log('[Dashboard] allDevices is array?:', Array.isArray(allDevices));
+    
+    if (!allDevices) {
+      console.log('[Dashboard] allDevices is null or undefined, returning []');
+      return [];
+    }
 
+    console.log('[Dashboard] Processing', allDevices.length, 'devices');
     let filtered = allDevices;
+    
     if (user?.role === 'perusahaan' && user?.perusahaanId) {
+      const beforeLen = filtered.length;
       filtered = filtered.filter((d) => d.id_perusahaan === user.perusahaanId);
+      console.log('[Dashboard] After perusahaan filter:', beforeLen, '->', filtered.length);
     }
     if (filters.provinsi) {
-      filtered = filtered.filter((d) => d.provinsi === filters.provinsi);
+      const beforeLen = filtered.length;
+      filtered = filtered.filter((d) =>
+        matchesRegionFilter(
+          filters.provinsi,
+          d.provinsi_nama,
+          d.provinsi_id,
+          (d as any).provinsi
+        )
+      );
+      console.log('[Dashboard] After provinsi filter:', beforeLen, '->', filtered.length);
     }
     if (filters.kabupaten) {
-      filtered = filtered.filter((d) => d.kabupaten === filters.kabupaten);
+      const beforeLen = filtered.length;
+      filtered = filtered.filter((d) =>
+        matchesRegionFilter(
+          filters.kabupaten,
+          d.kabupaten_nama,
+          d.kabupaten_id,
+          (d as any).kabupaten
+        )
+      );
+      console.log('[Dashboard] After kabupaten filter:', beforeLen, '->', filtered.length);
     }
     if (filters.jenis_perusahaan && allPerusahaan) {
+      const beforeLen = filtered.length;
       const companyIds = allPerusahaan
         .filter((p) => p.jenis_perusahaan === filters.jenis_perusahaan)
         .map((p) => p.id);
+      console.log('[Dashboard] Company IDs for filter:', companyIds);
       filtered = filtered.filter((d) => companyIds.includes(d.id_perusahaan));
+      console.log('[Dashboard] After jenis_perusahaan filter:', beforeLen, '->', filtered.length);
     }
 
+    console.log('[Dashboard] Final filtered result:', filtered);
+    console.log('[Dashboard] Final filtered is array?:', Array.isArray(filtered));
     return filtered;
   }, [
     allDevices,

@@ -16,16 +16,22 @@ interface TableRowProps {
   t: any;
 }
 
+const formatMetric = (value: unknown, digits: number, suffix = ''): string => {
+  const num = Number(value);
+  return Number.isFinite(num) ? `${num.toFixed(digits)}${suffix}` : '—';
+};
+
 const TableRow = memo(({ row, t }: TableRowProps) => (
   <tr className="hover:bg-slate-50 transition-colors">
     <td className="px-6 py-3 font-medium">{row.timestamp_data}</td>
     <td className="px-6 py-3 text-emerald-700">{row.device_id_unik}</td>
     <td className="px-6 py-3">{row.location}</td>
     <td className={`px-6 py-3 text-right font-bold ${row.tmat_value < -0.4 ? 'text-red-600' : 'text-slate-700'}`}>
-      {row.tmat_value}
+      {formatMetric(row.tmat_value, 2, ' cm')}
     </td>
-    <td className="px-6 py-3 text-right">{row.suhu_value}</td>
-    <td className="px-6 py-3 text-right">{row.ph_value}</td>
+    <td className="px-6 py-3 text-right">{formatMetric(row.suhu_value, 1, '°C')}</td>
+    <td className="px-6 py-3 text-right">{formatMetric(row.curah_hujan, 1, ' mm')}</td>
+    <td className="px-6 py-3 text-right">{formatMetric(row.kelembapan, 1, '%')}</td>
   </tr>
 ));
 
@@ -73,17 +79,17 @@ const RawData: React.FC = () => {
     
     return filtered.filter(device => {
       // Province filter
-      if (targetProv && device.provinsi !== targetProv) {
+      if (targetProv && device.provinsi_id !== targetProv) {
         return false;
       }
       
       // Kabupaten filter
-      if (filters.kabupaten && device.kabupaten !== filters.kabupaten) {
+      if (filters.kabupaten && device.kabupaten_id !== filters.kabupaten) {
         return false;
       }
       
       // Kecamatan filter
-      if (filters.kecamatan && device.kota !== filters.kecamatan) {
+      if (filters.kecamatan && device.kecamatan_id !== filters.kecamatan) {
         return false;
       }
       
@@ -177,7 +183,7 @@ const RawData: React.FC = () => {
         const rtRaw = rt as unknown as Record<string, unknown>;
         const realtimeProvinsi = pickText(rtRaw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
         return device
-          ? device.provinsi === targetProv || String(device.provinsi_id || '') === String(targetProv)
+          ? String(device.provinsi_id || '') === String(targetProv)
           : realtimeProvinsi === targetProv;
       })
       // Date range filter (only for realtime mode - historical fetch already handles this)
@@ -205,11 +211,14 @@ const RawData: React.FC = () => {
         const realtimeKabupaten = pickText(rtRaw, ['kabupaten', 'regency', 'nama_kabupaten', 'kabupaten_id']);
         const realtimeKecamatan = pickText(rtRaw, ['kecamatan', 'district', 'nama_kecamatan', 'kecamatan_id', 'kota', 'city']);
         const realtimeDesa = pickText(rtRaw, ['desa', 'kelurahan', 'village', 'village_name', 'kelurahan_id']);
-        const resolvedProvinsi = device?.provinsi || realtimeProvinsi || '-';
-        const resolvedKabupaten = device?.kabupaten || realtimeKabupaten || '-';
-        const resolvedKecamatan = device?.kota || realtimeKecamatan || '-';
+        const resolvedProvinsi = String(device?.provinsi_id || realtimeProvinsi || '-');
+        const resolvedKabupaten = String(device?.kabupaten_id || realtimeKabupaten || '-');
+        const resolvedKecamatan = String(device?.kecamatan_id || realtimeKecamatan || '-');
         const resolvedDesa = device?.desa || realtimeDesa || '';
         const resolvedAlamat = device?.alamat || pickText(rtRaw, ['alamat', 'address']) || '';
+        const resolvedLocation = [resolvedDesa || resolvedKecamatan, resolvedKabupaten, resolvedProvinsi]
+          .filter(Boolean)
+          .join(', ');
 
         return {
           ...rt,
@@ -219,7 +228,7 @@ const RawData: React.FC = () => {
           resolvedKecamatan,
           resolvedDesa,
           resolvedAlamat,
-          location: `${resolvedKecamatan}, ${resolvedProvinsi}`,
+          location: resolvedLocation,
         };
       });
   }, [isHistoricalMode, historicalData.data, realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
@@ -353,16 +362,17 @@ const RawData: React.FC = () => {
   const exportToCSV = useCallback(() => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Timestamp', 'Device ID', 'Location', 'TMAT (m)', 'Temperature (°C)', 'pH'];
+    const headers = ['Timestamp', 'Device ID', 'Location', 'TMAT (cm)', 'Temperature (°C)', 'Curah Hujan (mm)', 'Kelembapan (%)'];
     const csvContent = [
       headers.join(','),
       ...filteredData.map(row => [
         row.timestamp_data,
         row.device_id_unik,
         row.location,
-        row.tmat_value,
-        row.suhu_value,
-        row.ph_value
+        formatMetric(row.tmat_value, 2, ' cm'),
+        formatMetric(row.suhu_value, 1, '°C'),
+        formatMetric(row.curah_hujan, 1, ' mm'),
+        formatMetric(row.kelembapan, 1, '%')
       ].map(cell => `"${cell}"`).join(','))
     ].join('\n');
 
@@ -418,14 +428,15 @@ const RawData: React.FC = () => {
     }
 
     // Prepare table data
-    const headers = [['Timestamp', 'Device ID', 'Location', 'TMAT (m)', 'Temperature (°C)', 'pH']];
+    const headers = [['Timestamp', 'Device ID', 'Location', 'TMAT (cm)', 'Temperature (°C)', 'Curah Hujan (mm)', 'Kelembapan (%)']];
     const rows = filteredData.map(row => [
       row.timestamp_data,
       row.device_id_unik,
       row.location,
-      row.tmat_value.toString(),
-      row.suhu_value.toString(),
-      row.ph_value.toString()
+      formatMetric(row.tmat_value, 2, ' cm'),
+      formatMetric(row.suhu_value, 1, '°C'),
+      formatMetric(row.curah_hujan, 1, ' mm'),
+      formatMetric(row.kelembapan, 1, '%')
     ]);
 
     // Add table
@@ -476,9 +487,10 @@ const RawData: React.FC = () => {
       'Timestamp': row.timestamp_data,
       'Device ID': row.device_id_unik,
       'Location': row.location,
-      'TMAT (m)': row.tmat_value,
-      'Temperature (°C)': row.suhu_value,
-      'pH': row.ph_value
+      'TMAT (cm)': formatMetric(row.tmat_value, 2, ' cm'),
+      'Temperature (°C)': formatMetric(row.suhu_value, 1, '°C'),
+      'Curah Hujan (mm)': formatMetric(row.curah_hujan, 1, ' mm'),
+      'Kelembapan (%)': formatMetric(row.kelembapan, 1, '%')
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -491,7 +503,8 @@ const RawData: React.FC = () => {
       { wch: 25 }, // Location
       { wch: 15 }, // TMAT
       { wch: 18 }, // Temperature
-      { wch: 12 }, // pH
+      { wch: 18 }, // Rainfall
+      { wch: 15 }, // Humidity
     ];
 
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Raw Data');
@@ -695,7 +708,8 @@ const RawData: React.FC = () => {
                 <th className="px-6 py-3">{t('tables:rawData.headers.location')}</th>
                 <th className="px-6 py-3 text-right">{t('tables:rawData.headers.tmat')}</th>
                 <th className="px-6 py-3 text-right">{t('tables:rawData.headers.temperature')}</th>
-                <th className="px-6 py-3 text-right">{t('tables:rawData.headers.ph')}</th>
+                <th className="px-6 py-3 text-right">{t('tables:rawData.headers.rainfall', 'Curah Hujan (mm)')}</th>
+                <th className="px-6 py-3 text-right">{t('tables:rawData.headers.humidity', 'Kelembapan (%)')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -705,7 +719,7 @@ const RawData: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                     No data available
                   </td>
                 </tr>

@@ -13,16 +13,35 @@ const MapView: React.FC = () => {
   const { data: allPerusahaan, loading: perusahaanLoading } = usePerusahaan(user?.perusahaanId || undefined);
   const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(user?.perusahaanId || undefined);
 
+  const normalizeRegionValue = (value?: string | null): string => {
+    return (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const matchesRegionFilter = (filterValue: string, ...candidates: Array<string | null | undefined>): boolean => {
+    if (!filterValue) return true;
+    const target = normalizeRegionValue(filterValue);
+    return candidates.some((candidate) => normalizeRegionValue(candidate || '') === target);
+  };
+
   // Apply filters to device list
   const filteredDevices = useMemo(() => {
     if (!allDevices) return [];
 
     let filtered = allDevices;
     if (filters.provinsi) {
-      filtered = filtered.filter((d) => d.provinsi === filters.provinsi);
+      filtered = filtered.filter((d) =>
+        matchesRegionFilter(filters.provinsi, d.provinsi_nama, d.provinsi_id, (d as any).provinsi)
+      );
     }
     if (filters.kabupaten) {
-      filtered = filtered.filter((d) => d.kabupaten === filters.kabupaten);
+      filtered = filtered.filter((d) =>
+        matchesRegionFilter(filters.kabupaten, d.kabupaten_nama, d.kabupaten_id, (d as any).kabupaten)
+      );
     }
     if (filters.jenis_perusahaan && allPerusahaan) {
       const companyIds = allPerusahaan

@@ -100,6 +100,8 @@ const createWaterDropletIcon = (color: string = '#3b82f6', count?: number) => {
   });
 };
 
+const hasValidMetric = (value: number | undefined): value is number => Number.isFinite(value);
+
 interface Props {
   devices: Device[];
   heightClass?: string;
@@ -536,63 +538,199 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   // Center on Indonesia (geographic center of archipelago)
   const center: [number, number] = [-2.5, 118.0];
 
+  const scopedDevices = useMemo(() => {
+    return user?.role === 'perusahaan' && user?.perusahaanId
+      ? devices.filter((device) => device.id_perusahaan === user.perusahaanId)
+      : devices;
+  }, [devices, user?.role, user?.perusahaanId]);
+
+  const getProvinceValue = (device: Device) => (device.provinsi_nama || device.provinsi_id || '').trim();
+  const getKabupatenValue = (device: Device) => (device.kabupaten_nama || device.kabupaten_id || '').trim();
+  const getKecamatanValue = (device: Device) => (device.kecamatan_nama || device.kecamatan_id || '').trim();
+
   // Get unique provinces from devices data
   const provinceOptions = useMemo(() => {
-    if (!devices) return [];
+    if (!scopedDevices) return [];
     const provinces = new Set<string>();
-    devices.forEach(device => {
-      if (device.provinsi) {
-        provinces.add(device.provinsi);
+    scopedDevices.forEach(device => {
+        const province = getProvinceValue(device);
+        if (province) {
+          provinces.add(province);
       }
     });
     return Array.from(provinces).sort();
-  }, [devices]);
+  }, [scopedDevices]);
+
+  const provinceNameByValue = useMemo(() => {
+    const map = new Map<string, string>();
+    scopedDevices.forEach((device) => {
+      const id = (device.provinsi_id || '').trim();
+      const name = (device.provinsi_nama || '').trim();
+
+      if (name) {
+        map.set(name, name);
+      }
+      if (id) {
+        map.set(id, name || id);
+      }
+    });
+    return map;
+  }, [scopedDevices]);
+
+  const kabupatenNameByValue = useMemo(() => {
+    const map = new Map<string, string>();
+    scopedDevices.forEach((device) => {
+      const id = (device.kabupaten_id || '').trim();
+      const name = (device.kabupaten_nama || '').trim();
+
+      if (name) {
+        map.set(name, name);
+      }
+      if (id) {
+        map.set(id, name || id);
+      }
+    });
+    return map;
+  }, [scopedDevices]);
+
+  const kecamatanNameByValue = useMemo(() => {
+    const map = new Map<string, string>();
+    scopedDevices.forEach((device) => {
+      const id = (device.kecamatan_id || '').trim();
+      const name = (device.kecamatan_nama || '').trim();
+
+      if (name) {
+        map.set(name, name);
+      }
+      if (id) {
+        map.set(id, name || id);
+      }
+    });
+    return map;
+  }, [scopedDevices]);
+
+  const normalizeRegionValue = useCallback((value?: string | null) => {
+    return (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }, []);
+
+  const resolveProvinceLabel = useCallback((provinceValue: string) => {
+    if (!provinceValue) return '';
+    return provinceNameByValue.get(provinceValue) || provinceValue;
+  }, [provinceNameByValue]);
+
+  const resolveKabupatenLabel = useCallback((kabupatenValue: string) => {
+    if (!kabupatenValue) return '';
+    return kabupatenNameByValue.get(kabupatenValue) || kabupatenValue;
+  }, [kabupatenNameByValue]);
+
+  const resolveKecamatanLabel = useCallback((kecamatanValue: string) => {
+    if (!kecamatanValue) return '';
+    return kecamatanNameByValue.get(kecamatanValue) || kecamatanValue;
+  }, [kecamatanNameByValue]);
+
+  const matchesProvinceFilter = useCallback((filterValue: string, device: Device) => {
+    if (!filterValue) return true;
+
+    const filterLabel = resolveProvinceLabel(filterValue);
+    const deviceByName = resolveProvinceLabel(device.provinsi_nama || '');
+    const deviceById = resolveProvinceLabel(device.provinsi_id || '');
+    const target = normalizeRegionValue(filterLabel);
+
+    return target === normalizeRegionValue(deviceByName) || target === normalizeRegionValue(deviceById);
+  }, [normalizeRegionValue, resolveProvinceLabel]);
+
+  const matchesKabupatenFilter = useCallback((filterValue: string, device: Device) => {
+    if (!filterValue) return true;
+
+    const filterLabel = resolveKabupatenLabel(filterValue);
+    const deviceByName = resolveKabupatenLabel(device.kabupaten_nama || '');
+    const deviceById = resolveKabupatenLabel(device.kabupaten_id || '');
+    const target = normalizeRegionValue(filterLabel);
+
+    return target === normalizeRegionValue(deviceByName) || target === normalizeRegionValue(deviceById);
+  }, [normalizeRegionValue, resolveKabupatenLabel]);
+
+  const matchesKecamatanFilter = useCallback((filterValue: string, device: Device) => {
+    if (!filterValue) return true;
+
+    const filterLabel = resolveKecamatanLabel(filterValue);
+    const deviceByName = resolveKecamatanLabel(device.kecamatan_nama || '');
+    const deviceById = resolveKecamatanLabel(device.kecamatan_id || '');
+    const target = normalizeRegionValue(filterLabel);
+
+    return target === normalizeRegionValue(deviceByName) || target === normalizeRegionValue(deviceById);
+  }, [normalizeRegionValue, resolveKecamatanLabel]);
+
+  const enforcedProvinceLabel = useMemo(() => {
+    if (!enforcedProvinsi) return '';
+    return resolveProvinceLabel(enforcedProvinsi);
+  }, [enforcedProvinsi, resolveProvinceLabel]);
+
+  const provinceSelectOptions = useMemo(() => {
+    const options = new Map<string, string>();
+
+    provinceOptions.forEach((value) => {
+      options.set(value, resolveProvinceLabel(value));
+    });
+
+    if (filters.provinsi && !options.has(filters.provinsi)) {
+      options.set(filters.provinsi, resolveProvinceLabel(filters.provinsi));
+    }
+
+    if (enforcedProvinsi && !options.has(enforcedProvinsi)) {
+      options.set(enforcedProvinsi, enforcedProvinceLabel || enforcedProvinsi);
+    }
+
+    return Array.from(options.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [provinceOptions, resolveProvinceLabel, filters.provinsi, enforcedProvinsi, enforcedProvinceLabel]);
 
   // Get kabupaten/kota - show all when no province selected, filtered when province is selected
   const kabupatenOptions = useMemo(() => {
-    if (!devices) return [];
+    if (!scopedDevices) return [];
     const targetProv = enforcedProvinsi || filters.provinsi;
     
     const kabupaten = new Set<string>();
-    devices.forEach(device => {
+    scopedDevices.forEach(device => {
+      const kab = getKabupatenValue(device);
       // If there's a target province, filter by it; otherwise show all
       if (targetProv) {
-        if (device.provinsi === targetProv && device.kabupaten) {
-          kabupaten.add(device.kabupaten);
+        if (matchesProvinceFilter(targetProv, device) && kab) {
+          kabupaten.add(kab);
         }
       } else {
-        if (device.kabupaten) {
-          kabupaten.add(device.kabupaten);
+        if (kab) {
+          kabupaten.add(kab);
         }
       }
     });
     return Array.from(kabupaten).sort();
-  }, [devices, filters.provinsi, enforcedProvinsi]);
+  }, [scopedDevices, filters.provinsi, enforcedProvinsi, matchesProvinceFilter]);
 
   // Apply filters to devices
   const filteredDevices = useMemo(() => {
-    const byCompanyScope =
-      user?.role === 'perusahaan' && user?.perusahaanId
-        ? devices.filter((device) => device.id_perusahaan === user.perusahaanId)
-        : devices;
+    const byCompanyScope = scopedDevices;
 
     const byUiFilter = byCompanyScope.filter(device => {
-      if (filters.provinsi && device.provinsi !== filters.provinsi) return false;
-      if (filters.kabupaten && device.kabupaten !== filters.kabupaten) return false;
-      if (filters.kecamatan && device.kota !== filters.kecamatan) return false;
-      if (filters.desa && device.alamat && !device.alamat.toLowerCase().includes(filters.desa.toLowerCase())) return false;
+      if (!matchesProvinceFilter(filters.provinsi, device)) return false;
+      if (!matchesKabupatenFilter(filters.kabupaten, device)) return false;
+      if (!matchesKecamatanFilter(filters.kecamatan, device)) return false;
+      if (filters.desa && device.desa && !device.desa.toLowerCase().includes(filters.desa.toLowerCase())) return false;
       if (filters.jenis_perusahaan && device.id_perusahaan.toString() !== filters.jenis_perusahaan) return false;
       
       // Apply search filter
       if (filters.searchText) {
         const searchLower = filters.searchText.toLowerCase();
         const matchesId = device.device_id_unik.toLowerCase().includes(searchLower);
-        const matchesKota = device.kota.toLowerCase().includes(searchLower);
-        const matchesProvinsi = device.provinsi.toLowerCase().includes(searchLower);
-        const matchesKabupaten = device.kabupaten.toLowerCase().includes(searchLower);
+          const matchesDesa = device.desa?.toLowerCase().includes(searchLower);
+          const matchesTipeAlat = device.tipe_alat?.toLowerCase().includes(searchLower);
         const matchesAlamat = device.alamat?.toLowerCase().includes(searchLower);
         
-        if (!matchesId && !matchesKota && !matchesProvinsi && !matchesKabupaten && !matchesAlamat) {
+          if (!matchesId && !matchesDesa && !matchesTipeAlat && !matchesAlamat) {
           return false;
         }
       }
@@ -601,20 +739,40 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     });
 
     // Keep only devices with valid coordinates for map rendering.
-    return byUiFilter.filter(device =>
-      Number.isFinite(device.latitude) &&
-      Number.isFinite(device.longitude) &&
-      !(device.latitude === 0 && device.longitude === 0)
-    );
-  }, [devices, filters, user?.role, user?.perusahaanId]);
+    const withValidCoords = byUiFilter.filter((device) => {
+      const hasValidLat = Number.isFinite(device.latitude);
+      const hasValidLng = Number.isFinite(device.longitude);
+      const notZero = !(device.latitude === 0 && device.longitude === 0);
+
+      return hasValidLat && hasValidLng && notZero;
+    });
+
+    console.log('[DashboardMap] Input devices:', devices?.length ?? 0);
+    console.log('[DashboardMap] After company scope:', byCompanyScope.length);
+    console.log('[DashboardMap] After UI filter:', byUiFilter.length);
+    console.log('[DashboardMap] After coordinate validation:', withValidCoords.length);
+
+    if (byUiFilter.length > 0 && withValidCoords.length === 0) {
+      console.log('[DashboardMap] Coordinate validation sample:', byUiFilter.slice(0, 3).map((device) => ({
+        id: device.device_id_unik,
+        latitude: device.latitude,
+        longitude: device.longitude,
+        latitudeType: typeof device.latitude,
+        longitudeType: typeof device.longitude,
+      })));
+    }
+
+    return withValidCoords;
+  }, [scopedDevices, filters, matchesProvinceFilter, matchesKabupatenFilter, matchesKecamatanFilter]);
 
   // Debug logging
   useEffect(() => {
-    console.log('[DashboardMap] Devices:', devices?.length);
+    console.log('[DashboardMap] Input devices:', devices?.length);
     console.log('[DashboardMap] Filtered devices:', filteredDevices?.length);
     console.log('[DashboardMap] Realtime data:', realtimeData?.length);
     console.log('[DashboardMap] Loading:', realtimeLoading);
     console.log('[DashboardMap] Marker visibility:', showMarkers);
+    console.log('[DashboardMap] Current filters:', filters);
     console.log(
       '[DashboardMap] Sample marker coordinates:',
       filteredDevices.slice(0, 3).map((d) => ({
@@ -690,7 +848,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       const rtData = deviceDataMap.get(device.device_id_unik);
       
       // Handle offline devices
-      const status = rtData 
+      const status = rtData && hasValidMetric(rtData.tmat_value)
         ? getWaterLevelStatus(rtData.tmat_value, isIndonesian)
         : getOfflineStatus(isIndonesian);
       
@@ -787,15 +945,15 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
 
     filteredDevices.forEach(device => {
       const normalizedCity =
-        (typeof device.kota === 'string' && device.kota.trim()) ||
-        (typeof device.kabupaten === 'string' && device.kabupaten.trim()) ||
-        (typeof device.provinsi === 'string' && device.provinsi.trim()) ||
+        (typeof device.desa === 'string' && device.desa.trim()) ||
+        (typeof device.kabupaten_id === 'string' && device.kabupaten_id.trim()) ||
+        (typeof device.provinsi_id === 'string' && device.provinsi_id.trim()) ||
         'Unknown';
-      const cityKey = `${normalizedCity}, ${device.provinsi}`;
+      const cityKey = `${normalizedCity}, ${device.provinsi_id}`;
       if (!cities.has(cityKey)) {
         cities.set(cityKey, {
           city: normalizedCity,
-          provinsi: device.provinsi,
+          provinsi: device.provinsi_id,
           devices: [],
           centerLat: 0,
           centerLng: 0,
@@ -827,6 +985,10 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
           cityData.stats.offline++;
           return;
         }
+        if (!hasValidMetric(rtData.tmat_value)) {
+          cityData.stats.offline++;
+          return;
+        }
         const status = getWaterLevelStatus(rtData.tmat_value, isIndonesian);
         cityData.stats[status.severity as keyof typeof cityData.stats]++;
       });
@@ -850,6 +1012,10 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     filteredDevices.forEach(device => {
       const rtData = deviceDataMap.get(device.device_id_unik);
       if (!rtData) {
+        statusCounts.offline++;
+        return;
+      }
+      if (!hasValidMetric(rtData.tmat_value)) {
         statusCounts.offline++;
         return;
       }
@@ -918,15 +1084,15 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                     disabled={!!enforcedProvinsi}
                   >
                     <option value="">{isIndonesian ? 'Semua Provinsi' : 'All Provinces'}</option>
-                    {provinceOptions.map(prov => (
-                      <option key={prov} value={prov}>{prov}</option>
+                    {provinceSelectOptions.map(([provValue, provLabel]) => (
+                      <option key={provValue} value={provValue}>{provLabel}</option>
                     ))}
                   </select>
                   {enforcedProvinsi && (
                     <p className="text-[11px] text-emerald-600 font-medium">
                       {isIndonesian
-                        ? `Akun Anda dibatasi ke provinsi ${enforcedProvinsi}`
-                        : `Your account is restricted to ${enforcedProvinsi} province`}
+                        ? `Akun Anda dibatasi ke provinsi ${enforcedProvinceLabel}`
+                        : `Your account is restricted to ${enforcedProvinceLabel} province`}
                     </p>
                   )}
                 </div>
@@ -945,9 +1111,12 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                       
                       // Auto-update province when kabupaten is selected (if not enforced)
                       if (selectedKabupaten && !enforcedProvinsi && !filters.provinsi) {
-                        const matchingDevice = devices?.find(device => device.kabupaten === selectedKabupaten);
-                        if (matchingDevice?.provinsi) {
-                          updateFilter('provinsi', matchingDevice.provinsi);
+                        const matchingDevice = scopedDevices?.find(device =>
+                          matchesKabupatenFilter(selectedKabupaten, device)
+                        );
+                        const province = matchingDevice?.provinsi_nama || matchingDevice?.provinsi_id;
+                        if (province) {
+                          updateFilter('provinsi', province);
                         }
                       }
                     }}
@@ -1065,11 +1234,6 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
         worldCopyJump={true}
         preferCanvas={true}
         style={{ height: '100%', width: '100%' }}
-        whenReady={(map) => {
-          setTimeout(() => {
-            map.target.invalidateSize();
-          }, 100);
-        }}
       >
         {/* Dynamic Basemap Layer */}
         {selectedBasemap === 'osm' && (
@@ -1395,7 +1559,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
               )}
             </div>
 
-            {(filters.provinsi || filters.kabupaten || filters.jenisPerusahaan) && (
+            {(filters.provinsi || filters.kabupaten || filters.kecamatan || filters.jenisPerusahaan) && (
               <div className="mt-3 pt-3 border-t border-slate-100">
                 <p className="text-xs text-slate-500 mb-2 font-semibold">
                   {isIndonesian ? 'Filter Aktif:' : 'Active Filters:'}
@@ -1406,7 +1570,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       </svg>
-                      <span className="font-medium">{filters.provinsi}</span>
+                      <span className="font-medium">{resolveProvinceLabel(filters.provinsi)}</span>
                     </div>
                   )}
                   {filters.kabupaten && (
@@ -1414,7 +1578,15 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
-                      <span className="font-medium">{filters.kabupaten}</span>
+                      <span className="font-medium">{resolveKabupatenLabel(filters.kabupaten)}</span>
+                    </div>
+                  )}
+                  {filters.kecamatan && (
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      </svg>
+                      <span className="font-medium">{resolveKecamatanLabel(filters.kecamatan)}</span>
                     </div>
                   )}
                 </div>

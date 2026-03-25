@@ -10,7 +10,7 @@ import type { RtkQueryError } from './runtimeScope';
 /**
  * Base query for APIs that use custom `queryFn`.
  * All network calls are delegated to services/apiClient.ts so they
- * automatically inherit runtime key management and endpoint compatibility.
+ * automatically inherit proxy endpoint compatibility.
  */
 export const baseFetchQuery = fakeBaseQuery<RtkQueryError>();
 

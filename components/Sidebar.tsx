@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, Key, Users, FileText, Map as MapIcon, ChevronRight, ChevronLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, Database, Users, FileText, Map as MapIcon, ChevronRight, ChevronLeft, LogOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
@@ -84,13 +84,10 @@ const Sidebar: React.FC = () => {
           </>
         )}
         
-        {(user?.role === 'admin' || user?.role === 'perusahaan') && (
+        {user?.role === 'admin' && (
           <>
             {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-4 mt-6">{t('common:nav.admin')}</div>}
-            <NavItem to="/settings/api-credentials" icon={Key} label={t('common:nav.apiManagement')} />
-            {user?.role === 'admin' && (
-              <NavItem to="/users" icon={Users} label={t('common:nav.userRoles')} />
-            )}
+            <NavItem to="/users" icon={Users} label={t('common:nav.userRoles')} />
           </>
         )}
       </nav>

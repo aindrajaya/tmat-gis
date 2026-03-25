@@ -4,20 +4,18 @@
 
 export const API_CONFIG = {
   production: {
-    name: 'Production (KLHK)',
-    baseUrl:
-      'https://gambutindonesia.kemenlh.go.id/backoffice-SPAgambut/api/v1',
-    description: 'Production API server for live data',
+    name: 'Production Proxy',
+    baseUrl: 'https://proxy.yourdomain.com',
+    description: 'TMAT auth proxy production host',
   },
   development: {
-    name: 'Development',
-    baseUrl: 'https://coherent-afton-aruskoding-32476f63.koyeb.app/api/portal_v1',
-    description: 'Development API server for testing',
+    name: 'Development Proxy',
+    baseUrl: 'http://localhost:4000',
+    description: 'TMAT auth proxy development host',
   },
 };
 
 export type ApiMode = 'dev' | 'prod';
-export type ApiKeyMap = Record<string, string>;
 
 /**
  * Get API configuration for selected mode
@@ -39,39 +37,6 @@ export function getApiBaseUrl(mode: ApiMode): string {
 }
 
 /**
- * Get API key from environment
- */
-export function getApiKey(mode: ApiMode): string {
-  const runtime = loadRuntimeApiKeys();
-  if (mode === 'prod') {
-    return runtime.adminApiKey || import.meta.env.VITE_PROD_API_KEY_ADMIN || import.meta.env.VITE_PROD_API_KEY || '';
-  }
-  return import.meta.env.VITE_DEV_API_KEY || '';
-}
-
-/**
- * Get perusahaan API key map for production mode.
- * Expected format:
- * VITE_PROD_API_KEYS_PERUSAHAAN={"19":"keyA","24":"keyB"}
- */
-export function getPerusahaanApiKeyMap(mode: ApiMode): ApiKeyMap {
-  if (mode !== 'prod') return {};
-  return loadRuntimeApiKeys().perusahaanApiKeys;
-}
-
-/**
- * Resolve API key by scope.
- * For production, perusahaan-specific key has priority when perusahaanId is provided.
- */
-export function resolveApiKey(mode: ApiMode, perusahaanId?: number): string {
-  const adminKey = getApiKey(mode);
-  if (mode !== 'prod' || !perusahaanId) return adminKey;
-
-  const perusahaanKeys = getPerusahaanApiKeyMap(mode);
-  return perusahaanKeys[String(perusahaanId)] || adminKey;
-}
-
-/**
  * Get current API mode from environment
  */
 export function getCurrentApiMode(): ApiMode {
@@ -84,12 +49,3 @@ export function getCurrentApiMode(): ApiMode {
 export function formatApiEndpoint(baseUrl: string, endpoint: string): string {
   return `${baseUrl}${endpoint}`;
 }
-
-/**
- * Check if API key is configured
- */
-export function isApiKeyConfigured(mode: ApiMode): boolean {
-  const key = getApiKey(mode);
-  return key && key.length > 0 && key !== 'TULIS_KEY_PUBLIK_DISINI';
-}
-import { loadRuntimeApiKeys } from './runtimeApiKeys';

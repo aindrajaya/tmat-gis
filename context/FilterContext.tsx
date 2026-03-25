@@ -109,17 +109,17 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Enforce province filter when user has province restriction
   useEffect(() => {
-    if (user?.provinsi) {
-      setEnforcedProvinsi(user.provinsi);
+    if (user?.provinsiId) {
+      setEnforcedProvinsi(user.provinsiId);
       setFilters(prev => ({
         ...prev,
-        provinsi: user.provinsi,
+        provinsi: user.provinsiId,
       }));
     } else {
       setEnforcedProvinsi(null);
       setFilters(prev => ({ ...prev, provinsi: '' }));
     }
-  }, [user?.provinsi]);
+  }, [user?.provinsiId]);
 
   return (
     <FilterContext.Provider value={{ filters, updateFilter, setTimePeriod, resetFilters, apiMode, setApiMode, enforcedProvinsi, updateSelectedCity }}>

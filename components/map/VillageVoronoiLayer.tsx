@@ -494,20 +494,20 @@ const VillageVoronoiLayer: React.FC<VillageVoronoiLayerProps> = React.memo(({
             <div class="bg-slate-50 rounded-lg p-2 space-y-1.5">
               <div class="flex items-center justify-between">
                 <span class="text-xs text-slate-600">ID:</span>
-                <span class="text-xs font-medium text-slate-800">${device.device_id_unik}</span>
+                <span class="text-xs font-medium text-slate-800">Device ${device.kode_titik || device.device_id_unik}</span>
               </div>
               
               <div class="flex items-center justify-between">
                 <span class="text-xs text-slate-600">
                   ${isIndonesian ? 'Lokasi' : 'Location'}:
                 </span>
-                <span class="text-xs font-medium text-slate-800">${device.kota}</span>
+                <span class="text-xs font-medium text-slate-800">${[device.desa, device.kabupaten_id, device.provinsi_id].filter(Boolean).join(', ') || 'Unknown'}</span>
               </div>
 
               ${voronoiData.rtData ? `
                 <div class="flex items-center justify-between">
                   <span class="text-xs text-slate-600">TMAT:</span>
-                  <span class="text-xs font-semibold text-slate-800">${voronoiData.rtData.tmat_value.toFixed(2)}</span>
+                  <span class="text-xs font-semibold text-slate-800">${voronoiData.rtData.tmat_value.toFixed(2)} cm</span>
                 </div>
                 
                 <div class="flex items-center justify-between">
@@ -518,8 +518,17 @@ const VillageVoronoiLayer: React.FC<VillageVoronoiLayerProps> = React.memo(({
                 </div>
 
                 <div class="flex items-center justify-between">
-                  <span class="text-xs text-slate-600">pH:</span>
-                  <span class="text-xs font-medium text-slate-700">${voronoiData.rtData.ph_value.toFixed(2)}</span>
+                  <span class="text-xs text-slate-600">
+                    ${isIndonesian ? 'Curah Hujan' : 'Rainfall'}:
+                  </span>
+                  <span class="text-xs font-medium text-slate-700">${Number.isFinite(voronoiData.rtData.curah_hujan) ? `${voronoiData.rtData.curah_hujan.toFixed(1)} mm` : '—'}</span>
+                </div>
+
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-slate-600">
+                    ${isIndonesian ? 'Kelembapan' : 'Humidity'}:
+                  </span>
+                  <span class="text-xs font-medium text-slate-700">${Number.isFinite(voronoiData.rtData.kelembapan) ? `${voronoiData.rtData.kelembapan.toFixed(1)}%` : '—'}</span>
                 </div>
               ` : `
                 <p class="text-xs text-slate-500 italic text-center py-1">

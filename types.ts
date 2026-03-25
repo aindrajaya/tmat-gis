@@ -19,24 +19,26 @@ export interface Device {
   id: number;
   device_id_unik: string;
   id_perusahaan: number;
-  id_site: number;
+  id_site?: number;
   tipe_alat: string;
   alamat?: string | null;
-  provinsi: string;
-  kabupaten: string;
-  kota: string;
-  desa?: string | null;
   provinsi_id?: string | null;
   kabupaten_id?: string | null;
   kecamatan_id?: string | null;
   kelurahan_id?: string | null;
+  kode_pos?: string;
+  desa?: string | null;
   latitude: number;
   longitude: number;
   status: string;
-  last_online: string;
+  last_online?: string | null;
   created_at: string;
-  kode_titik: string;
+  kode_titik?: string;
   kode_blok: string;
+  provinsi_nama?: string | null;
+  kabupaten_nama?: string | null;
+  kecamatan_nama?: string | null;
+  kelurahan_nama?: string | null;
 }
 
 export interface RealtimeData {
@@ -46,6 +48,8 @@ export interface RealtimeData {
   tmat_value: number;
   suhu_value: number;
   ph_value: number;
+  curah_hujan?: number;
+  kelembapan?: number;
 }
 
 export interface DashboardSummary {

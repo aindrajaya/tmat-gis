@@ -22,6 +22,17 @@ interface VoronoiLayerProps {
   isIndonesian: boolean;
 }
 
+const formatMetric = (value: number, digits: number, suffix = ''): string =>
+  Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : '—';
+
+const getDeviceLocationLabel = (device: Device): string => {
+  return [device.desa, device.kabupaten_id, device.provinsi_id].filter(Boolean).join(', ') || 'Unknown';
+};
+
+const getDeviceDisplayLabel = (device: Device): string => {
+  return `Device ${device.kode_titik || device.device_id_unik}`;
+};
+
 /**
  * Memoized Voronoi Layer Component
  * Only re-renders when polygons data actually changes
@@ -67,7 +78,7 @@ const VoronoiLayer: React.FC<VoronoiLayerProps> = memo(({
             <Popup maxWidth={280} minWidth={240} closeButton={false}>
               <div className="p-1">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-slate-800 text-sm flex-1">{device.device_id_unik}</h3>
+                  <h3 className="font-bold text-slate-800 text-sm flex-1">{getDeviceDisplayLabel(device)}</h3>
                   <button
                     onClick={closePopup}
                     className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors ml-2"
@@ -79,7 +90,7 @@ const VoronoiLayer: React.FC<VoronoiLayerProps> = memo(({
                   </button>
                 </div>
                 <p className="text-xs text-slate-600 mb-3">
-                  {device.kota}, {device.provinsi}
+                  {getDeviceLocationLabel(device)}
                 </p>
                 
                 <div className="space-y-2 mb-3">
@@ -112,7 +123,7 @@ const VoronoiLayer: React.FC<VoronoiLayerProps> = memo(({
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-slate-500">TMAT:</span>
                         <span className="text-xs font-semibold text-slate-700">
-                          {rtData.tmat_value.toFixed(2)}
+                          {formatMetric(rtData.tmat_value, 2, ' cm')}
                         </span>
                       </div>
 
@@ -121,14 +132,25 @@ const VoronoiLayer: React.FC<VoronoiLayerProps> = memo(({
                           {isIndonesian ? 'Suhu' : 'Temperature'}:
                         </span>
                         <span className="text-xs font-semibold text-slate-700">
-                          {rtData.suhu_value.toFixed(1)}°C
+                          {formatMetric(rtData.suhu_value, 1, '°C')}
                         </span>
                       </div>
 
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">pH:</span>
+                        <span className="text-xs text-slate-500">
+                          {isIndonesian ? 'Curah Hujan' : 'Rainfall'}:
+                        </span>
                         <span className="text-xs font-semibold text-slate-700">
-                          {rtData.ph_value.toFixed(2)}
+                          {formatMetric(rtData.curah_hujan, 1, ' mm')}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500">
+                          {isIndonesian ? 'Kelembapan' : 'Humidity'}:
+                        </span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {formatMetric(rtData.kelembapan, 1, '%')}
                         </span>
                       </div>
 

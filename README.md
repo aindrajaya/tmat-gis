@@ -272,12 +272,10 @@ Create `.env.local` file (not committed to repo):
 VITE_API_MODE=dev              # 'dev' or 'prod'
 
 # Production API
-VITE_PROD_API_URL=https://staging.kurmaspace.com/klhk/app/index.php/api/portal_v1
-VITE_PROD_API_KEY=your_production_api_key
+VITE_PROD_API_URL=https://proxy.yourdomain.com
 
 # Development API  
-VITE_DEV_API_URL=https://coherent-afton-aruskoding-32476f63.koyeb.app/api/portal_v1
-VITE_DEV_API_KEY=your_dev_api_key
+VITE_DEV_API_URL=http://localhost:4000
 
 # App Configuration
 VITE_APP_NAME=TMAT Monitor
@@ -461,19 +459,18 @@ const devices = await client.getDevice();
 
 ### API Authentication
 
-All requests include the `X-API-KEY` header automatically:
+Authentication uses HttpOnly session cookie from `/auth/login`, with frontend requests sending credentials automatically:
 
 ```typescript
-// The following is added automatically by the API client:
-headers: {
-  'X-API-KEY': apiKey,
-  'Content-Type': 'application/json'
-}
+fetch(url, {
+  credentials: 'include',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
 ```
 
-**Important:** Set your API keys in `.env.local`:
-- `VITE_PROD_API_KEY` - Production API key
-- `VITE_DEV_API_KEY` - Development API key
+`openapi.yaml` is the source of truth for backend contract (`/auth/*` and `/proxy/*`).
 
 
 

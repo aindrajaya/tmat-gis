@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff, Lock, Mail, AlertCircle, Copy, Check } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 
 const Login: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -15,8 +15,6 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [copiedEmail, setCopiedEmail] = useState(false);
-  const [copiedPassword, setCopiedPassword] = useState(false);
 
   // Redirect if already authenticated
   React.useEffect(() => {
@@ -58,35 +56,6 @@ const Login: React.FC = () => {
     }
   };
 
-  const copyToClipboard = async (text: string, type: 'email' | 'password') => {
-    try {
-      // Try modern clipboard API first (requires HTTPS)
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        // Fallback for HTTP or older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-      
-      if (type === 'email') {
-        setCopiedEmail(true);
-        setTimeout(() => setCopiedEmail(false), 2000);
-      } else {
-        setCopiedPassword(true);
-        setTimeout(() => setCopiedPassword(false), 2000);
-      }
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -102,7 +71,7 @@ const Login: React.FC = () => {
               />
             </div>
             <h1 className="text-2xl font-bold text-slate-800 mb-2">
-              {isIndonesian ? 'Selamat Datang Test' : 'Welcome Back Test'}
+              {isIndonesian ? 'Selamat Datang' : 'Welcome Back'}
             </h1>
             <p className="text-slate-700 font-semibold text-sm mb-1">
               {isIndonesian 
@@ -203,90 +172,6 @@ const Login: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Demo Credentials Info */}
-          <div className="mt-6 pt-6 border-t border-slate-200">
-            <p className="text-xs text-center text-slate-500 mb-2 font-semibold">
-              {isIndonesian ? 'Demo Kredensial:' : 'Demo Credentials:'}
-            </p>
-            <div className="bg-slate-50 rounded-lg p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex-1">
-                  <p className="text-xs text-slate-600">
-                    <strong>{isIndonesian ? 'Email:' : 'Email:'}</strong>{' '}
-                    <code className="bg-white px-2 py-0.5 rounded text-emerald-700 font-mono text-xs">
-                      admin@kemenlh.mail
-                    </code>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard('admin@kemenlh.mail', 'email')}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded transition-colors"
-                  title={isIndonesian ? 'Salin email' : 'Copy email'}
-                >
-                  {copiedEmail ? (
-                    <>
-                      <Check className="w-3 h-3" />
-                      <span>{isIndonesian ? 'Tersalin' : 'Copied'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>{isIndonesian ? 'Salin' : 'Copy'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex-1">
-                  <p className="text-xs text-slate-600">
-                    <strong>{isIndonesian ? 'Password:' : 'Password:'}</strong>{' '}
-                    <code className="bg-white px-2 py-0.5 rounded text-emerald-700 font-mono text-xs">
-                      Admin12345
-                    </code>
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard('Admin12345', 'password')}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded transition-colors"
-                  title={isIndonesian ? 'Salin password' : 'Copy password'}
-                >
-                  {copiedPassword ? (
-                    <>
-                      <Check className="w-3 h-3" />
-                      <span>{isIndonesian ? 'Tersalin' : 'Copied'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>{isIndonesian ? 'Salin' : 'Copy'}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-slate-200">
-            <p className="text-xs text-slate-500 mb-2 font-semibold">
-              {isIndonesian ? 'Akun User Perusahaan:' : 'Company User Accounts:'}
-            </p>
-            <div className="bg-slate-50 rounded-lg p-3 space-y-1 text-xs text-slate-700">
-              <p><code className="bg-white px-1 rounded">superadminnsp</code> | nspmeranti@gmail.com</p>
-              <p><code className="bg-white px-1 rounded">admmujurlestari</code> | admmujurlestari@gmail.com</p>
-              <p><code className="bg-white px-1 rounded">admgrutilestaripratama</code> | admgrutilestaripratama@gmail.com</p>
-              <p><code className="bg-white px-1 rounded">Sampoerna Agro</code> | superadmsampoernaagro@gmail.com</p>
-              <p><code className="bg-white px-1 rounded">admfajarpematangindahlestari</code> | admfajarpematangindahlestari@gmail.com</p>
-              <p><code className="bg-white px-1 rounded">admrambangagrojaya</code> | admrambangagrojaya@gmail.com</p>
-              <p className="pt-2 text-slate-500">
-                {isIndonesian
-                  ? 'Password default untuk user perusahaan mengikuti username.'
-                  : 'Default password for company users is the username.'}
-              </p>
-            </div>
-          </div>
 
         </div>
 

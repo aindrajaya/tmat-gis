@@ -5,7 +5,7 @@ import { useAPIClient, useRealtimeAll } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
 import TMATTrendChart from './charts/TMATTrendChart';
-import { X, ChevronUp, MapPin, Droplet, Thermometer, TestTube } from 'lucide-react';
+import { X, ChevronUp, MapPin, Droplet, Thermometer, CloudRain, Waves } from 'lucide-react';
 import { getWaterLevelStatus } from '../utils/waterLevelStatus';
 
 interface Props {
@@ -45,6 +45,18 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
     }
 
     return parsed.toLocaleString(isIndonesian ? 'id-ID' : 'en-US');
+  };
+
+  const formatMetric = (value: number | undefined, digits: number, suffix = ''): string => {
+    return Number.isFinite(value) ? `${value!.toFixed(digits)}${suffix}` : '—';
+  };
+
+  const getDeviceDisplayLabel = (device: Device): string => {
+    return `Device ${device.kode_titik || device.device_id_unik}`;
+  };
+
+  const getDeviceLocationLabel = (device: Device): string => {
+    return [device.desa, device.kabupaten_id, device.provinsi_id].filter(Boolean).join(', ') || '-';
   };
 
   useEffect(() => {
@@ -210,10 +222,10 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
             </button>
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-slate-800 text-sm truncate">
-                {selectedDevice.device_id_unik}
+                {getDeviceDisplayLabel(selectedDevice)}
               </h3>
               <p className="text-xs text-slate-500 truncate">
-                {selectedDevice.kota}, {selectedDevice.provinsi}
+                {getDeviceLocationLabel(selectedDevice)}
               </p>
             </div>
           </div>
@@ -259,7 +271,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     <div className="flex items-center gap-2">
                       <Droplet size={14} style={{ color: currentStatus?.color || '#64748b' }} />
                       <span className="text-sm font-bold text-slate-800">
-                        {currentRealtime ? currentRealtime.tmat_value.toFixed(2) : '—'} cm
+                        {formatMetric(currentRealtime?.tmat_value, 2, ' cm')}
                       </span>
                     </div>
                   </div>
@@ -272,18 +284,33 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     <div className="flex items-center gap-2">
                       <Thermometer size={14} className="text-orange-500" />
                       <span className="text-sm font-bold text-slate-800">
-                        {currentRealtime ? currentRealtime.suhu_value.toFixed(1) : '—'}°C
+                        {formatMetric(currentRealtime?.suhu_value, 1, '°C')}
                       </span>
                     </div>
                   </div>
 
-                  {/* pH Value */}
+                  {/* Rainfall */}
                   <div className="bg-white rounded-lg p-3 border border-slate-100">
-                    <p className="text-xs text-slate-500 mb-1">pH</p>
+                    <p className="text-xs text-slate-500 mb-1">
+                      {isIndonesian ? 'Curah Hujan' : 'Rainfall'}
+                    </p>
                     <div className="flex items-center gap-2">
-                      <TestTube size={14} className="text-blue-500" />
+                      <CloudRain size={14} className="text-blue-500" />
                       <span className="text-sm font-bold text-slate-800">
-                        {currentRealtime ? currentRealtime.ph_value.toFixed(2) : '—'}
+                        {formatMetric(currentRealtime?.curah_hujan, 1, ' mm')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Humidity */}
+                  <div className="bg-white rounded-lg p-3 border border-slate-100">
+                    <p className="text-xs text-slate-500 mb-1">
+                      {isIndonesian ? 'Kelembapan' : 'Humidity'}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Waves size={14} className="text-cyan-500" />
+                      <span className="text-sm font-bold text-slate-800">
+                        {formatMetric(currentRealtime?.kelembapan, 1, '%')}
                       </span>
                     </div>
                   </div>
@@ -363,15 +390,15 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
               <div className="space-y-1 text-xs text-slate-600">
                 <div className="flex justify-between">
                   <span>{t('dashboard:analytics.deviceId')}:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.device_id_unik}</span>
+                  <span className="font-medium text-slate-800">{getDeviceDisplayLabel(selectedDevice)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('dashboard:analytics.city')}:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.kota}</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.desa || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('dashboard:analytics.province')}:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.provinsi}</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.provinsi_id || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Provinsi ID:</span>

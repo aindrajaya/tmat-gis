@@ -5,8 +5,10 @@
       "timestamp": "Timestamp",
       "deviceId": "Device ID",
       "location": "Location",
-      "tmat": "TMAT (m)",
+      "tmat": "TMAT (cm)",
       "temperature": "Temp (°C)",
+      "rainfall": "Rainfall (mm)",
+      "humidity": "Humidity (%)",
       "ph": "pH"
     },
     "pagination": "Showing X records",

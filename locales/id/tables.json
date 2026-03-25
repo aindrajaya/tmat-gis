@@ -5,8 +5,10 @@
       "timestamp": "Stempel Waktu",
       "deviceId": "ID Perangkat",
       "location": "Lokasi",
-      "tmat": "TMAT (m)",
+      "tmat": "TMAT (cm)",
       "temperature": "Suhu (°C)",
+      "rainfall": "Curah Hujan (mm)",
+      "humidity": "Kelembapan (%)",
       "ph": "pH"
     },
     "pagination": "Menampilkan X catatan",

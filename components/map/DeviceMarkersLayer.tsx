@@ -19,6 +19,19 @@ interface DeviceMarkersLayerProps {
   createWaterDropletIcon: (color: string, count?: number) => L.DivIcon;
 }
 
+const hasValidMetric = (value: number | undefined): value is number => Number.isFinite(value);
+
+const formatMetric = (value: number | undefined, digits: number, suffix = ''): string =>
+  hasValidMetric(value) ? `${value.toFixed(digits)}${suffix}` : '—';
+
+const getDeviceLocationLabel = (device: Device): string => {
+  return [device.desa, device.kabupaten_id, device.provinsi_id].filter(Boolean).join(', ') || 'Unknown';
+};
+
+const getDeviceDisplayLabel = (device: Device): string => {
+  return `Device ${device.kode_titik || device.device_id_unik}`;
+};
+
 /**
  * Memoized Device Markers Layer Component
  * Only re-renders when device groups data or visibility changes
@@ -35,17 +48,30 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
 }) => {
   const map = useMap();
   
+  console.log('[DeviceMarkersLayer] Rendering:', {
+    deviceGroupsSize: deviceGroups?.size,
+    showMarkers,
+    isLoading,
+    deviceDataMapSize: deviceDataMap?.size,
+  });
+  
   const closePopup = () => {
     if (map) {
       map.closePopup();
     }
   };
   
-  if (!showMarkers || isLoading) return null;
+  if (!showMarkers || isLoading) {
+    console.log('[DeviceMarkersLayer] Early return - showMarkers:', showMarkers, 'isLoading:', isLoading);
+    return null;
+  }
+
+  const markerArray = Array.from(deviceGroups.entries());
+  console.log('[DeviceMarkersLayer] Rendering', markerArray.length, 'device groups');
 
   return (
     <>
-      {Array.from(deviceGroups.entries()).map(([locationKey, groupDevices]: [string, Device[]]) => {
+      {markerArray.map(([locationKey, groupDevices]: [string, Device[]]) => {
         const firstDevice = groupDevices[0];
         const deviceCount = groupDevices.length;
         
@@ -64,7 +90,7 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
 
         groupDevices.forEach(device => {
           const rtData = deviceDataMap.get(device.device_id_unik);
-          if (rtData) {
+          if (rtData && hasValidMetric(rtData.tmat_value)) {
             const status = getWaterLevelStatus(rtData.tmat_value, isIndonesian);
             const severityLevel = severityOrder[status.severity as keyof typeof severityOrder] || 0;
             
@@ -100,7 +126,7 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
                     </button>
                   </div>
                   <p className="text-xs text-slate-600 mb-3">
-                    {firstDevice.kota}, {firstDevice.provinsi}
+                    {getDeviceLocationLabel(firstDevice)}
                   </p>
                   <div className="mb-3 p-2 bg-emerald-50 rounded-lg border border-emerald-100">
                     <p className="text-xs text-emerald-700 font-semibold">
@@ -110,14 +136,16 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {groupDevices.map(device => {
                       const rtData = deviceDataMap.get(device.device_id_unik);
-                      const status = rtData ? getWaterLevelStatus(rtData.tmat_value) : null;
+                      const status = rtData && hasValidMetric(rtData.tmat_value)
+                        ? getWaterLevelStatus(rtData.tmat_value, isIndonesian)
+                        : null;
                       return (
                         <button
                           key={device.id}
                           onClick={() => onDeviceSelect(device)}
                           className="w-full flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-emerald-100 transition-colors text-left peer group/item"
                         >
-                          <span className="text-xs font-medium text-slate-700">{device.device_id_unik}</span>
+                          <span className="text-xs font-medium text-slate-700">{getDeviceDisplayLabel(device)}</span>
                           {status && (
                             <div 
                               className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -141,10 +169,10 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex-1">
                       <h3 className="font-bold text-slate-800 text-sm">
-                        {firstDevice.device_id_unik}
+                        {getDeviceDisplayLabel(firstDevice)}
                       </h3>
                       <p className="text-xs text-slate-600 mt-1">
-                        {firstDevice.kota}, {firstDevice.provinsi}
+                        {getDeviceLocationLabel(firstDevice)}
                       </p>
                     </div>
                     <button
@@ -163,23 +191,41 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
                       <span className="text-xs font-medium text-emerald-700">
                         {isIndonesian ? 'Status' : 'Status'}
                       </span>
-                      {deviceDataMap.has(firstDevice.device_id_unik) && (
+                      {hasValidMetric(deviceDataMap.get(firstDevice.device_id_unik)?.tmat_value) && (
                         <span className="text-xs font-bold text-emerald-700">
-                          {getWaterLevelStatus(deviceDataMap.get(firstDevice.device_id_unik)?.tmat_value || 0).level}
+                          {getWaterLevelStatus(deviceDataMap.get(firstDevice.device_id_unik)!.tmat_value, isIndonesian).level}
                         </span>
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    {deviceDataMap.has(firstDevice.device_id_unik) ? (
+                    {hasValidMetric(deviceDataMap.get(firstDevice.device_id_unik)?.tmat_value) ? (
                       <>
                         <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
                           <span className="text-xs text-slate-600">
                             {isIndonesian ? 'Nilai TMAT' : 'TMAT Value'}
                           </span>
                           <span className="text-xs font-bold text-slate-800">
-                            {deviceDataMap.get(firstDevice.device_id_unik)?.tmat_value.toFixed(2)} cm
+                            {formatMetric(deviceDataMap.get(firstDevice.device_id_unik)?.tmat_value, 2, ' cm')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <span className="text-xs text-slate-600">
+                            {isIndonesian ? 'Curah Hujan' : 'Rainfall'}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800">
+                            {formatMetric(deviceDataMap.get(firstDevice.device_id_unik)?.curah_hujan, 1, ' mm')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <span className="text-xs text-slate-600">
+                            {isIndonesian ? 'Kelembapan' : 'Humidity'}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800">
+                            {formatMetric(deviceDataMap.get(firstDevice.device_id_unik)?.kelembapan, 1, '%')}
                           </span>
                         </div>
                         

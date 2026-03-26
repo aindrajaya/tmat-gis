@@ -1,4 +1,12 @@
-import { Device, Perusahaan, PerusahaanWithDevices, RealtimeData } from '../types';
+import {
+  Device,
+  Perusahaan,
+  PerusahaanWithDevices,
+  PublicMapAnalytics,
+  PublicMapDevice,
+  PublicMapSummary,
+  RealtimeData
+} from '../types';
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -62,6 +70,38 @@ function normalizeRealtimeData(raw: any): RealtimeData {
   };
 }
 
+function normalizePublicLatestRealtime(raw: any) {
+  return {
+    timestamp_data: raw?.timestamp_data ?? null,
+    tmat_value: raw?.tmat_value == null ? null : normalizeNumericValue(raw.tmat_value),
+    curah_hujan: raw?.curah_hujan == null ? null : normalizeNumericValue(raw.curah_hujan),
+    kelembapan: raw?.kelembapan == null ? null : normalizeNumericValue(raw.kelembapan),
+    suhu_value: raw?.suhu_value == null ? null : normalizeNumericValue(raw.suhu_value),
+  };
+}
+
+function normalizePublicMapDevice(raw: any): PublicMapDevice {
+  return {
+    device_id_unik: String(raw.device_id_unik || ''),
+    kode_titik: raw.kode_titik ?? null,
+    latitude: Number(raw.latitude),
+    longitude: Number(raw.longitude),
+    status: raw.status || 'nonaktif',
+    tipe_alat: raw.tipe_alat ?? null,
+    provinsi_id: raw.provinsi_id ?? null,
+    provinsi_nama: raw.provinsi_nama ?? null,
+    kabupaten_id: raw.kabupaten_id ?? null,
+    kabupaten_nama: raw.kabupaten_nama ?? null,
+    kecamatan_id: raw.kecamatan_id ?? null,
+    kecamatan_nama: raw.kecamatan_nama ?? null,
+    desa: raw.desa ?? null,
+    id_perusahaan: raw.id_perusahaan == null ? null : Number(raw.id_perusahaan),
+    jenis_perusahaan: raw.jenis_perusahaan ?? null,
+    perusahaan_nama: raw.perusahaan_nama ?? null,
+    latest_realtime: normalizePublicLatestRealtime(raw.latest_realtime || {}),
+  };
+}
+
 export class APIClient {
   private baseUrl: string;
 
@@ -105,12 +145,14 @@ export class APIClient {
   async getPerusahaan(id?: number): Promise<Perusahaan[]> {
     if (id) {
       const response = await this.request<any>(`/proxy/perusahaan/${id}`);
-      const data = response?.data ? [response.data] : [response];
+      const rawSingle = response?.data ?? response?.master_perusahaan ?? response;
+      const data = Array.isArray(rawSingle) ? rawSingle : [rawSingle];
       return data;
     }
     const response = await this.request<any>('/proxy/perusahaan');
-    // Extract data array from wrapped response
-    return Array.isArray(response) ? response : response?.data || [];
+    return Array.isArray(response)
+      ? response
+      : response?.data || response?.master_perusahaan || [];
   }
 
   async getPerusahaanById(id: number): Promise<Perusahaan> {
@@ -139,7 +181,10 @@ export class APIClient {
     console.log('[APIClient] getDevice is array?:', Array.isArray(response));
     
     // Extract data array from wrapped response
-    const devices = (Array.isArray(response) ? response : response?.data || []).map(normalizeDevice);
+    const rawDevices = Array.isArray(response)
+      ? response
+      : response?.data || response?.master_device || [];
+    const devices = rawDevices.map(normalizeDevice);
     
     console.log('[APIClient] Extracted devices:', devices);
     console.log('[APIClient] Extracted devices is array?:', Array.isArray(devices));
@@ -165,7 +210,10 @@ export class APIClient {
   async getRealtimeAll(idPerusahaan?: number): Promise<RealtimeData[]> {
     const query = idPerusahaan ? `?id_perusahaan=${idPerusahaan}` : '';
     const response = await this.request<any>(`/proxy/realtime_all${query}`);
-    return (Array.isArray(response) ? response : response?.data || []).map(normalizeRealtimeData);
+    const rawRealtime = Array.isArray(response)
+      ? response
+      : response?.data || response?.data_realtime || [];
+    return rawRealtime.map(normalizeRealtimeData);
   }
 
   async getRealtimeDevice(
@@ -186,7 +234,10 @@ export class APIClient {
     if (perusahaanId) params.append('id_perusahaan', String(perusahaanId));
 
     const response = await this.request<any>(`/proxy/realtime_device?${params.toString()}`);
-    return (Array.isArray(response) ? response : response?.data || []).map(normalizeRealtimeData);
+    const rawRealtime = Array.isArray(response)
+      ? response
+      : response?.data || response?.data_realtime || [];
+    return rawRealtime.map(normalizeRealtimeData);
   }
 
   async getRealtimeDevicePaginated(
@@ -210,6 +261,37 @@ export class APIClient {
     return {
       ...response,
       data: (response.data || []).map(normalizeRealtimeData),
+    };
+  }
+
+  async getPublicMapSummary(): Promise<PublicMapSummary> {
+    return this.request<PublicMapSummary>('/public/map/summary');
+  }
+
+  async getPublicMapDevices(filters: Record<string, string>): Promise<PublicMapDevice[]> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const query = params.toString();
+    const response = await this.request<any>(`/public/map/devices${query ? `?${query}` : ''}`);
+    const rawDevices = response?.data || [];
+    return rawDevices.map(normalizePublicMapDevice);
+  }
+
+  async getPublicMapAnalytics(filters: Record<string, string>): Promise<PublicMapAnalytics> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const query = params.toString();
+    const response = await this.request<any>(`/public/map/analytics${query ? `?${query}` : ''}`);
+    return {
+      filters: response?.filters || {},
+      daily: response?.daily || [],
+      weekly: response?.weekly || [],
+      trend: response?.trend || [],
+      available_date_range: response?.available_date_range || { min_date: null, max_date: null },
     };
   }
 }

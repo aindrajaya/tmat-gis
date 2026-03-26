@@ -6,7 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAPIClient, APIClient } from './apiClient';
-import { Device, Perusahaan, RealtimeData } from '../types';
+import { Device, Perusahaan, PublicMapAnalytics, PublicMapDevice, PublicMapSummary, RealtimeData } from '../types';
 import { splitDateRangeIntoChunks, DateChunk } from '../utils/dateChunking';
 
 export interface UseApiState<T> {
@@ -56,7 +56,24 @@ export function useApi<T>(
  * Hook to get all devices
  */
 export function useDevices(perusahaanId?: number) {
-  return useApi<Device[]>((client) => client.getDevice(undefined, perusahaanId));
+  const query = useQuery({
+    queryKey: ['devices', perusahaanId ?? 'all'],
+    queryFn: async () => {
+      const client = getAPIClient();
+      return client.getDevice(undefined, perusahaanId);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  return {
+    data: query.data ?? null,
+    loading: (query.isLoading || query.isFetching) && !query.data,
+    error: (query.error as Error | null) ?? null,
+    refetch: async () => {
+      await query.refetch();
+    },
+  };
 }
 
 /**
@@ -96,7 +113,24 @@ export function useDeviceById(deviceId: string, perusahaanId?: number) {
  * Hook to get all companies
  */
 export function usePerusahaan(id?: number) {
-  return useApi<Perusahaan[]>((client) => client.getPerusahaan(id));
+  const query = useQuery({
+    queryKey: ['perusahaan', id ?? 'all'],
+    queryFn: async () => {
+      const client = getAPIClient();
+      return client.getPerusahaan(id);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  return {
+    data: query.data ?? null,
+    loading: (query.isLoading || query.isFetching) && !query.data,
+    error: (query.error as Error | null) ?? null,
+    refetch: async () => {
+      await query.refetch();
+    },
+  };
 }
 
 /**
@@ -136,9 +170,87 @@ export function usePerusahaanById(id: number) {
  * Hook to get realtime data summary
  */
 export function useRealtimeAll(idPerusahaan?: number) {
-  return useApi<RealtimeData[]>((client) =>
-    client.getRealtimeAll(idPerusahaan)
-  );
+  const query = useQuery({
+    queryKey: ['realtime-all', idPerusahaan ?? 'all'],
+    queryFn: async () => {
+      const client = getAPIClient();
+      return client.getRealtimeAll(idPerusahaan);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  return {
+    data: query.data ?? null,
+    loading: (query.isLoading || query.isFetching) && !query.data,
+    error: (query.error as Error | null) ?? null,
+    refetch: async () => {
+      await query.refetch();
+    },
+  };
+}
+
+export function usePublicMapSummary() {
+  const query = useQuery({
+    queryKey: ['public-map-summary'],
+    queryFn: async () => {
+      const client = getAPIClient();
+      return client.getPublicMapSummary();
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  return {
+    data: query.data ?? null,
+    loading: (query.isLoading || query.isFetching) && !query.data,
+    error: (query.error as Error | null) ?? null,
+    refetch: async () => {
+      await query.refetch();
+    },
+  };
+}
+
+export function usePublicMapDevices(filters: Record<string, string>) {
+  const query = useQuery({
+    queryKey: ['public-map-devices', filters],
+    queryFn: async () => {
+      const client = getAPIClient();
+      return client.getPublicMapDevices(filters);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  return {
+    data: query.data ?? null,
+    loading: (query.isLoading || query.isFetching) && !query.data,
+    error: (query.error as Error | null) ?? null,
+    refetch: async () => {
+      await query.refetch();
+    },
+  };
+}
+
+export function usePublicMapAnalytics(filters: Record<string, string>) {
+  const query = useQuery({
+    queryKey: ['public-map-analytics', filters],
+    queryFn: async () => {
+      const client = getAPIClient();
+      return client.getPublicMapAnalytics(filters);
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  return {
+    data: query.data ?? null,
+    loading: (query.isLoading || query.isFetching) && !query.data,
+    error: (query.error as Error | null) ?? null,
+    refetch: async () => {
+      await query.refetch();
+    },
+  };
 }
 
 /**

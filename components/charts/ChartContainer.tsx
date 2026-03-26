@@ -15,6 +15,7 @@ interface ChartContainerProps {
   dailyData: any[];
   weeklyData: any[];
   trendData: any[];
+  isLoading?: boolean;
   selectedCity?: string | null;
   scopeLabel?: string | null;
   mapRef?: RefObject<HTMLDivElement | null>;
@@ -29,6 +30,7 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   dailyData,
   weeklyData,
   trendData,
+  isLoading = false,
   selectedCity,
   scopeLabel,
   mapRef,
@@ -512,7 +514,15 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   const handleDownloadWeeklyPDFWithGraphics = () => downloadPDFWithGraphics(weeklyData, 'weekly');
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-10 rounded-xl bg-white/70 backdrop-blur-[1px] flex items-center justify-center">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white shadow-sm border border-slate-200 text-sm text-slate-700">
+            <Loader2 size={16} className="animate-spin" />
+            <span>Loading charts...</span>
+          </div>
+        </div>
+      )}
       {/* View Toggle */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <h2 className="text-lg font-bold text-slate-800">

@@ -47,7 +47,7 @@ export const getWaterLevelStatus = (tmatValue: number, isIndonesian = true): Wat
   } else if (tmatValue >= -0.6) {
     return {
       level: isIndonesian ? 'Tinggi' : 'High',
-      color: '#FFFF00',
+      color: '#F2D335',
       range: '40 - 60 cm',
       description: isIndonesian ? 'Tinggi - Bahaya' : 'High water level - Danger',
       severity: 'high'

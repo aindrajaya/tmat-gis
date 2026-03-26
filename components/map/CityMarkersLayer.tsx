@@ -152,7 +152,7 @@ const CityMarkerComponent: React.FC<{
               </div>
               
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FFFF00' }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F2D335' }}></div>
                 <span className="text-slate-600">
                   {isIndonesian ? 'Tinggi' : 'High'}: {stats.high}
                 </span>
@@ -222,7 +222,7 @@ const CityMarkersLayer: React.FC<CityMarkersLayerProps> = memo(({
         const statusCounts = [
           { color: '#EE0000', count: stats.extreme },     // red - extreme
           { color: '#FFC000', count: stats.veryhigh },    // orange - very high
-          { color: '#FFFF00', count: stats.high },        // yellow - high
+          { color: '#F2D335', count: stats.high },        // yellow - high
           { color: '#00B0F0', count: stats.medium },      // light blue - medium
           { color: '#00B050', count: stats.low },         // green - low
           { color: '#703CA0', count: stats.safe },        // purple - no risk

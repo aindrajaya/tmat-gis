@@ -61,6 +61,80 @@ export interface DashboardSummary {
   trendData: any[];
 }
 
+export interface PublicMapSummary {
+  latest_data_date: string | null;
+  default_start_date: string | null;
+  default_end_date: string | null;
+  total_devices: number;
+  active_devices: number;
+  critical_devices: number;
+  last_updated_at: string | null;
+}
+
+export interface PublicLatestRealtime {
+  timestamp_data: string | null;
+  tmat_value: number | null;
+  curah_hujan: number | null;
+  kelembapan: number | null;
+  suhu_value: number | null;
+}
+
+export interface PublicMapDevice {
+  device_id_unik: string;
+  kode_titik?: string | null;
+  latitude: number;
+  longitude: number;
+  status: string;
+  tipe_alat?: string | null;
+  provinsi_id?: string | null;
+  provinsi_nama?: string | null;
+  kabupaten_id?: string | null;
+  kabupaten_nama?: string | null;
+  kecamatan_id?: string | null;
+  kecamatan_nama?: string | null;
+  desa?: string | null;
+  id_perusahaan?: number | null;
+  jenis_perusahaan?: string | null;
+  perusahaan_nama?: string | null;
+  latest_realtime: PublicLatestRealtime;
+}
+
+export interface PublicMapAnalyticsBucket {
+  safe: number;
+  low: number;
+  medium: number;
+  high: number;
+  veryhigh: number;
+  extreme: number;
+  offline: number;
+}
+
+export interface PublicMapDailyAnalyticsBucket extends PublicMapAnalyticsBucket {
+  date: string;
+}
+
+export interface PublicMapWeeklyAnalyticsBucket extends PublicMapAnalyticsBucket {
+  week: string;
+}
+
+export interface PublicMapTrendPoint {
+  time: string;
+  tmat: number | null;
+}
+
+export interface PublicAvailableDateRange {
+  min_date: string | null;
+  max_date: string | null;
+}
+
+export interface PublicMapAnalytics {
+  filters: Record<string, string>;
+  daily: PublicMapDailyAnalyticsBucket[];
+  weekly: PublicMapWeeklyAnalyticsBucket[];
+  trend: PublicMapTrendPoint[];
+  available_date_range: PublicAvailableDateRange;
+}
+
 export interface FilterState {
   provinsi: string;
   kabupaten: string;

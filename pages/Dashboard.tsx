@@ -52,6 +52,15 @@ const Dashboard: React.FC = () => {
     return candidates.some((candidate) => normalizeRegionValue(candidate || '') === target);
   };
 
+  const getSelectedCityValue = (device: Device): string => {
+    return (
+      (typeof device.desa === 'string' && device.desa.trim()) ||
+      (typeof device.kabupaten_id === 'string' && device.kabupaten_id.trim()) ||
+      (typeof device.provinsi_id === 'string' && device.provinsi_id.trim()) ||
+      ''
+    );
+  };
+
   // Helper function to get week start date (Monday)
   const getWeekStart = (date: string): string => {
     const d = new Date(date + 'T00:00:00');
@@ -110,8 +119,6 @@ const Dashboard: React.FC = () => {
 
       setChartLoading(true);
       setChartError(null);
-      // Clear stale chart rows first to avoid showing previous scope temporarily.
-      setChartRealtimeData([]);
 
       try {
         const limit = 500;
@@ -269,7 +276,7 @@ const Dashboard: React.FC = () => {
       // If a city is selected, filter devices by that city first
       let applicableDevices = filteredDevices; // Track which devices to use for offline calculation
       if (filters.selectedCity) {
-        const cityDevices = filteredDevices.filter(d => d.kota === filters.selectedCity);
+        const cityDevices = filteredDevices.filter((d) => getSelectedCityValue(d) === filters.selectedCity);
         applicableDevices = cityDevices;
         const cityDeviceIds = cityDevices.map(d => d.device_id_unik);
         relevantData = relevantData.filter(r => cityDeviceIds.includes(r.device_id_unik));
@@ -403,7 +410,7 @@ const Dashboard: React.FC = () => {
   }, [filters, filteredDevices, chartRealtimeData]);
 
   // Handle loading and errors
-  if (devicesLoading || perusahaanLoading || realtimeLoading || chartLoading) {
+  if (devicesLoading || perusahaanLoading || realtimeLoading) {
     return (
       <div className="p-6">
         <div className="text-center py-12">
@@ -447,7 +454,12 @@ const Dashboard: React.FC = () => {
       {/* Map Section */}
       <section className="space-y-3">
         <h2 className="text-lg font-bold text-slate-800">{t('dashboard:map.stationDistribution')}</h2>
-        <DashboardMap ref={mapRef} devices={filteredDevices} />
+        <DashboardMap
+          ref={mapRef}
+          devices={filteredDevices}
+          realtimeData={realtimeData}
+          realtimeLoading={realtimeLoading}
+        />
       </section>
 
       {/* Location Filter Display */}
@@ -501,6 +513,7 @@ const Dashboard: React.FC = () => {
         dailyData={chartData}
         weeklyData={weeklyChartData}
         trendData={trendData}
+        isLoading={chartLoading}
         selectedCity={filters.selectedCity || undefined}
         scopeLabel={scopeLabel}
         mapRef={mapRef}

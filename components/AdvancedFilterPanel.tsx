@@ -1,119 +1,119 @@
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Filter, X } from 'lucide-react';
 import { useFilters } from '../context/FilterContext';
-import { useDevices, useRealtimeAll } from '../services/useApi';
-import { useAuth } from '../context/AuthContext';
-import { Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Device } from '../types';
 
-const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const { t, i18n } = useTranslation();
+interface AdvancedFilterPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  devices?: Device[];
+}
+
+const AdvancedFilterPanel: React.FC<AdvancedFilterPanelProps> = ({ isOpen, onClose, devices }) => {
+  const { i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { filters, updateFilter, setTimePeriod, resetFilters, enforcedProvinsi } = useFilters();
-  const { user } = useAuth();
-  const { data: devices } = useDevices(user?.perusahaanId || undefined);
-  const { data: realtimeData } = useRealtimeAll(user?.perusahaanId || undefined);
   const [activeTab, setActiveTab] = useState<'location' | 'date' | 'search'>('location');
+  const sourceDevices = devices ?? [];
 
-  const pickText = (record: Record<string, unknown>, keys: string[]): string => {
-    for (const key of keys) {
-      const value = record[key];
-      if (value !== undefined && value !== null) {
-        const normalized = String(value).trim();
-        if (normalized) return normalized;
-      }
-    }
-    return '';
-  };
+  const getProvinceValue = useCallback((device: Device) => (device.provinsi_nama || device.provinsi_id || '').trim(), []);
+  const getKabupatenValue = useCallback((device: Device) => (device.kabupaten_nama || device.kabupaten_id || '').trim(), []);
+  const getKecamatanValue = useCallback((device: Device) => (device.kecamatan_nama || device.kecamatan_id || '').trim(), []);
+
+  const normalizeRegionValue = useCallback((value?: string | null) => {
+    return (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }, []);
+
+  const provinceNameByValue = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDevices.forEach((device) => {
+      const id = (device.provinsi_id || '').trim();
+      const name = (device.provinsi_nama || '').trim();
+      if (name) map.set(name, name);
+      if (id) map.set(id, name || id);
+    });
+    return map;
+  }, [sourceDevices]);
+
+  const kabupatenNameByValue = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDevices.forEach((device) => {
+      const id = (device.kabupaten_id || '').trim();
+      const name = (device.kabupaten_nama || '').trim();
+      if (name) map.set(name, name);
+      if (id) map.set(id, name || id);
+    });
+    return map;
+  }, [sourceDevices]);
+
+  const kecamatanNameByValue = useMemo(() => {
+    const map = new Map<string, string>();
+    sourceDevices.forEach((device) => {
+      const id = (device.kecamatan_id || '').trim();
+      const name = (device.kecamatan_nama || '').trim();
+      if (name) map.set(name, name);
+      if (id) map.set(id, name || id);
+    });
+    return map;
+  }, [sourceDevices]);
+
+  const resolveProvinceLabel = useCallback((value: string) => {
+    if (!value) return '';
+    return provinceNameByValue.get(value) || value;
+  }, [provinceNameByValue]);
+
+  const resolveKabupatenLabel = useCallback((value: string) => {
+    if (!value) return '';
+    return kabupatenNameByValue.get(value) || value;
+  }, [kabupatenNameByValue]);
+
+  const resolveKecamatanLabel = useCallback((value: string) => {
+    if (!value) return '';
+    return kecamatanNameByValue.get(value) || value;
+  }, [kecamatanNameByValue]);
+
+  const matchesProvinceFilter = useCallback((filterValue: string, device: Device) => {
+    if (!filterValue) return true;
+
+    const filterLabel = resolveProvinceLabel(filterValue);
+    const deviceByName = resolveProvinceLabel(device.provinsi_nama || '');
+    const deviceById = resolveProvinceLabel(device.provinsi_id || '');
+    const target = normalizeRegionValue(filterLabel);
+
+    return target === normalizeRegionValue(deviceByName) || target === normalizeRegionValue(deviceById);
+  }, [normalizeRegionValue, resolveProvinceLabel]);
+
+  const matchesKabupatenFilter = useCallback((filterValue: string, device: Device) => {
+    if (!filterValue) return true;
+
+    const filterLabel = resolveKabupatenLabel(filterValue);
+    const deviceByName = resolveKabupatenLabel(device.kabupaten_nama || '');
+    const deviceById = resolveKabupatenLabel(device.kabupaten_id || '');
+    const target = normalizeRegionValue(filterLabel);
+
+    return target === normalizeRegionValue(deviceByName) || target === normalizeRegionValue(deviceById);
+  }, [normalizeRegionValue, resolveKabupatenLabel]);
+
+  const matchesKecamatanFilter = useCallback((filterValue: string, device: Device) => {
+    if (!filterValue) return true;
+
+    const filterLabel = resolveKecamatanLabel(filterValue);
+    const deviceByName = resolveKecamatanLabel(device.kecamatan_nama || '');
+    const deviceById = resolveKecamatanLabel(device.kecamatan_id || '');
+    const target = normalizeRegionValue(filterLabel);
+
+    return target === normalizeRegionValue(deviceByName) || target === normalizeRegionValue(deviceById);
+  }, [normalizeRegionValue, resolveKecamatanLabel]);
 
   const handlePresetClick = (period: 'today' | '7d' | '14d' | '30d') => {
     setTimePeriod(period);
   };
-
-  // Get unique provinces from devices data
-  const provinceOptions = useMemo(() => {
-    const provinces = new Set<string>();
-    (devices || []).forEach(device => {
-      if (device.provinsi) provinces.add(device.provinsi);
-    });
-    (realtimeData || []).forEach(rt => {
-      const raw = rt as unknown as Record<string, unknown>;
-      const prov = pickText(raw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
-      if (prov) provinces.add(prov);
-    });
-    return Array.from(provinces).sort();
-  }, [devices, realtimeData]);
-
-  // Get kabupaten/kota - show all when no province selected, filtered when province is selected
-  const kabupatenOptions = useMemo(() => {
-    const targetProv = enforcedProvinsi || filters.provinsi;
-    
-    const kabupaten = new Set<string>();
-    (devices || []).forEach(device => {
-      // If there's a target province, filter by it; otherwise show all
-      if (targetProv) {
-        if (device.provinsi === targetProv && device.kabupaten) {
-          kabupaten.add(device.kabupaten);
-        }
-      } else {
-        if (device.kabupaten) {
-          kabupaten.add(device.kabupaten);
-        }
-      }
-    });
-    (realtimeData || []).forEach(rt => {
-      const raw = rt as unknown as Record<string, unknown>;
-      const prov = pickText(raw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
-      const kab = pickText(raw, ['kabupaten', 'regency', 'nama_kabupaten', 'kabupaten_id']);
-      if (!kab) return;
-      if (targetProv) {
-        if (prov === targetProv) kabupaten.add(kab);
-      } else {
-        kabupaten.add(kab);
-      }
-    });
-    return Array.from(kabupaten).sort();
-  }, [devices, realtimeData, filters.provinsi, enforcedProvinsi]);
-
-  // Get kecamatan filtered by selected kabupaten
-  const kecamatanOptions = useMemo(() => {
-    if (!filters.kabupaten) return [];
-    const kecamatan = new Set<string>();
-    (devices || []).forEach(device => {
-      if (device.kabupaten === filters.kabupaten && device.kota) {
-        kecamatan.add(device.kota);
-      }
-    });
-    (realtimeData || []).forEach(rt => {
-      const raw = rt as unknown as Record<string, unknown>;
-      const kab = pickText(raw, ['kabupaten', 'regency', 'nama_kabupaten', 'kabupaten_id']);
-      const kec = pickText(raw, ['kecamatan', 'district', 'nama_kecamatan', 'kecamatan_id', 'kota', 'city']);
-      if (kab === filters.kabupaten && kec) {
-        kecamatan.add(kec);
-      }
-    });
-    return Array.from(kecamatan).sort();
-  }, [devices, realtimeData, filters.kabupaten]);
-
-  // Get desa filtered by selected kecamatan
-  const desaOptions = useMemo(() => {
-    if (!filters.kecamatan) return [];
-    const desa = new Set<string>();
-    (devices || []).forEach(device => {
-      if (device.kota === filters.kecamatan) {
-        if (device.desa) desa.add(device.desa);
-        if (device.alamat) desa.add(device.alamat);
-      }
-    });
-    (realtimeData || []).forEach(rt => {
-      const raw = rt as unknown as Record<string, unknown>;
-      const kec = pickText(raw, ['kecamatan', 'district', 'nama_kecamatan', 'kecamatan_id', 'kota', 'city']);
-      const des = pickText(raw, ['desa', 'kelurahan', 'village', 'village_name', 'kelurahan_id', 'alamat', 'address']);
-      if (kec === filters.kecamatan && des) {
-        desa.add(des);
-      }
-    });
-    return Array.from(desa).sort();
-  }, [devices, realtimeData, filters.kecamatan]);
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTimePeriod('custom');
@@ -125,9 +125,81 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
     updateFilter('endDate', e.target.value);
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    updateFilter('searchText', e.target.value);
-  };
+  const provinceOptions = useMemo(() => {
+    const provinces = new Set<string>();
+    sourceDevices.forEach((device) => {
+      const province = getProvinceValue(device);
+      if (province) provinces.add(province);
+    });
+    return Array.from(provinces).sort();
+  }, [sourceDevices, getProvinceValue]);
+
+  const enforcedProvinceLabel = useMemo(() => {
+    if (!enforcedProvinsi) return '';
+    return resolveProvinceLabel(enforcedProvinsi);
+  }, [enforcedProvinsi, resolveProvinceLabel]);
+
+  const provinceSelectOptions = useMemo(() => {
+    const options = new Map<string, string>();
+
+    provinceOptions.forEach((value) => {
+      options.set(value, resolveProvinceLabel(value));
+    });
+
+    if (filters.provinsi && !options.has(filters.provinsi)) {
+      options.set(filters.provinsi, resolveProvinceLabel(filters.provinsi));
+    }
+
+    if (enforcedProvinsi && !options.has(enforcedProvinsi)) {
+      options.set(enforcedProvinsi, enforcedProvinceLabel || enforcedProvinsi);
+    }
+
+    return Array.from(options.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [provinceOptions, resolveProvinceLabel, filters.provinsi, enforcedProvinsi, enforcedProvinceLabel]);
+
+  const kabupatenOptions = useMemo(() => {
+    const targetProv = enforcedProvinsi || filters.provinsi;
+    const kabupaten = new Set<string>();
+
+    sourceDevices.forEach((device) => {
+      const kab = getKabupatenValue(device);
+      if (!kab) return;
+
+      if (targetProv) {
+        if (matchesProvinceFilter(targetProv, device)) kabupaten.add(kab);
+      } else {
+        kabupaten.add(kab);
+      }
+    });
+
+    return Array.from(kabupaten).sort();
+  }, [sourceDevices, enforcedProvinsi, filters.provinsi, getKabupatenValue, matchesProvinceFilter]);
+
+  const kecamatanOptions = useMemo(() => {
+    if (!filters.kabupaten) return [];
+
+    const kecamatan = new Set<string>();
+    sourceDevices.forEach((device) => {
+      const kec = getKecamatanValue(device);
+      if (matchesKabupatenFilter(filters.kabupaten, device) && kec) {
+        kecamatan.add(kec);
+      }
+    });
+
+    return Array.from(kecamatan).sort();
+  }, [sourceDevices, filters.kabupaten, getKecamatanValue, matchesKabupatenFilter]);
+
+  const desaOptions = useMemo(() => {
+    if (!filters.kecamatan) return [];
+
+    const desa = new Set<string>();
+    sourceDevices.forEach((device) => {
+      if (!matchesKecamatanFilter(filters.kecamatan, device)) return;
+      if (device.desa) desa.add(device.desa);
+    });
+
+    return Array.from(desa).sort();
+  }, [sourceDevices, filters.kecamatan, matchesKecamatanFilter]);
 
   const activeFiltersCount = [
     filters.provinsi,
@@ -142,15 +214,9 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-start justify-center pt-20">
-      {/* Overlay */}
-      <div 
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Filter Panel */}
       <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl m-4 max-h-[80vh] overflow-y-auto border border-slate-200">
-        {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2">
             <Filter size={20} className="text-emerald-600" />
@@ -163,15 +229,11 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
               </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X size={24} />
           </button>
         </div>
 
-        {/* Tab Navigation */}
         <div className="flex border-b border-slate-200 bg-slate-50 sticky top-[73px] z-10">
           <button
             onClick={() => setActiveTab('location')}
@@ -205,12 +267,9 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Location Tab */}
           {activeTab === 'location' && (
             <div className="space-y-4">
-              {/* Province Filter */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {isIndonesian ? 'Provinsi' : 'Province'}
@@ -219,7 +278,6 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   value={filters.provinsi}
                   onChange={(e) => {
                     updateFilter('provinsi', e.target.value);
-                    // Reset child filters when province changes
                     updateFilter('kabupaten', '');
                     updateFilter('kecamatan', '');
                     updateFilter('desa', '');
@@ -228,20 +286,19 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-50 disabled:cursor-not-allowed"
                 >
                   <option value="">{isIndonesian ? 'Semua Provinsi' : 'All Provinces'}</option>
-                  {provinceOptions.map(prov => (
-                    <option key={prov} value={prov}>{prov}</option>
+                  {provinceSelectOptions.map(([provValue, provLabel]) => (
+                    <option key={provValue} value={provValue}>{provLabel}</option>
                   ))}
                 </select>
                 {enforcedProvinsi && (
                   <p className="text-xs text-emerald-600 font-medium mt-2">
-                    ℹ️ {isIndonesian
-                      ? `Akun Anda dibatasi ke provinsi ${enforcedProvinsi}`
-                      : `Your account is restricted to ${enforcedProvinsi} province`}
+                    {isIndonesian
+                      ? `Akun Anda dibatasi ke provinsi ${enforcedProvinceLabel}`
+                      : `Your account is restricted to ${enforcedProvinceLabel} province`}
                   </p>
                 )}
               </div>
 
-              {/* Regency Filter */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {isIndonesian ? 'Kabupaten/Kota' : 'Regency/City'}
@@ -251,30 +308,27 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   onChange={(e) => {
                     const selectedKabupaten = e.target.value;
                     updateFilter('kabupaten', selectedKabupaten);
-                    
-                    // Auto-update province when kabupaten is selected (if not enforced)
+
                     if (selectedKabupaten && !enforcedProvinsi && !filters.provinsi) {
-                      const matchingDevice = devices?.find(device => device.kabupaten === selectedKabupaten);
-                      if (matchingDevice?.provinsi) {
-                        updateFilter('provinsi', matchingDevice.provinsi);
+                      const matchingDevice = sourceDevices.find((device) => matchesKabupatenFilter(selectedKabupaten, device));
+                      const province = matchingDevice?.provinsi_nama || matchingDevice?.provinsi_id;
+                      if (province) {
+                        updateFilter('provinsi', province);
                       }
                     }
-                    
-                    // Reset child filters when kabupaten changes
+
                     updateFilter('kecamatan', '');
                     updateFilter('desa', '');
                   }}
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700"
                 >
                   <option value="">{isIndonesian ? 'Semua Kabupaten/Kota' : 'All Regencies/Cities'}</option>
-                  {kabupatenOptions.map(kab => (
-                    <option key={kab} value={kab}>{kab}</option>
+                  {kabupatenOptions.map((kab) => (
+                    <option key={kab} value={kab}>{resolveKabupatenLabel(kab)}</option>
                   ))}
                 </select>
-
               </div>
 
-              {/* Kecamatan Filter */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {isIndonesian ? 'Kecamatan' : 'District'}
@@ -283,15 +337,14 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   value={filters.kecamatan}
                   onChange={(e) => {
                     updateFilter('kecamatan', e.target.value);
-                    // Reset desa when kecamatan changes
                     updateFilter('desa', '');
                   }}
                   disabled={!filters.kabupaten}
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
                 >
                   <option value="">{isIndonesian ? 'Semua Kecamatan' : 'All Districts'}</option>
-                  {kecamatanOptions.map(kec => (
-                    <option key={kec} value={kec}>{kec}</option>
+                  {kecamatanOptions.map((kec) => (
+                    <option key={kec} value={kec}>{resolveKecamatanLabel(kec)}</option>
                   ))}
                 </select>
                 {!filters.kabupaten && (
@@ -301,7 +354,6 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 )}
               </div>
 
-              {/* Desa Filter */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {isIndonesian ? 'Desa/Kelurahan' : 'Village'}
@@ -313,8 +365,8 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 disabled:bg-slate-100 disabled:cursor-not-allowed"
                 >
                   <option value="">{isIndonesian ? 'Semua Desa/Kelurahan' : 'All Villages'}</option>
-                  {desaOptions.map(des => (
-                    <option key={des} value={des}>{des}</option>
+                  {desaOptions.map((desa) => (
+                    <option key={desa} value={desa}>{desa}</option>
                   ))}
                 </select>
                 {!filters.kecamatan && (
@@ -324,7 +376,6 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 )}
               </div>
 
-              {/* Company Type Filter */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {isIndonesian ? 'Jenis Perusahaan' : 'Company Type'}
@@ -337,16 +388,13 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   <option value="">{isIndonesian ? 'Semua Jenis' : 'All Types'}</option>
                   <option value="PBPH">PBPH</option>
                   <option value="Perkebunan">Perkebunan</option>
-                  <option value="Sawit">Sawit</option>
                 </select>
               </div>
             </div>
           )}
 
-          {/* Date Range Tab */}
           {activeTab === 'date' && (
             <div className="space-y-4">
-              {/* Preset Buttons */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
                   {isIndonesian ? 'Rentang Cepat' : 'Quick Range'}
@@ -355,9 +403,7 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   <button
                     onClick={() => handlePresetClick('today')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      filters.timePeriod === 'today'
-                        ? 'bg-emerald-500 text-white shadow-lg'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      filters.timePeriod === 'today' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {isIndonesian ? 'Hari Ini' : 'Today'}
@@ -365,9 +411,7 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   <button
                     onClick={() => handlePresetClick('7d')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      filters.timePeriod === '7d'
-                        ? 'bg-emerald-500 text-white shadow-lg'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      filters.timePeriod === '7d' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {isIndonesian ? '7 Hari' : '7 Days'}
@@ -375,9 +419,7 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   <button
                     onClick={() => handlePresetClick('14d')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      filters.timePeriod === '14d'
-                        ? 'bg-emerald-500 text-white shadow-lg'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      filters.timePeriod === '14d' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {isIndonesian ? '14 Hari' : '14 Days'}
@@ -385,9 +427,7 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   <button
                     onClick={() => handlePresetClick('30d')}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                      filters.timePeriod === '30d'
-                        ? 'bg-emerald-500 text-white shadow-lg'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      filters.timePeriod === '30d' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {isIndonesian ? '30 Hari' : '30 Days'}
@@ -395,7 +435,6 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 </div>
               </div>
 
-              {/* Custom Date Range */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
                   {isIndonesian ? 'Rentang Kustom' : 'Custom Range'}
@@ -426,7 +465,6 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                 </div>
               </div>
 
-              {/* Date Info */}
               <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                 <p className="text-xs text-emerald-700">
                   <span className="font-semibold">{isIndonesian ? 'Periode Aktif:' : 'Active Period:'}</span> {filters.startDate} - {filters.endDate}
@@ -440,7 +478,6 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
             </div>
           )}
 
-          {/* Search Tab */}
           {activeTab === 'search' && (
             <div className="space-y-4">
               <div>
@@ -452,7 +489,7 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                     type="text"
                     placeholder={isIndonesian ? 'Cari ID perangkat, nama, lokasi...' : 'Search device ID, name, location...'}
                     value={filters.searchText || ''}
-                    onChange={handleSearchChange}
+                    onChange={(e) => updateFilter('searchText', e.target.value)}
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all text-slate-700 placeholder-slate-400"
                   />
                   {filters.searchText && (
@@ -465,13 +502,12 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
                   )}
                 </div>
                 <p className="text-xs text-slate-500 mt-2">
-                  {isIndonesian 
-                    ? 'Cari berdasarkan ID perangkat, nama lokasi, atau nama perusahaan'
-                    : 'Search by device ID, location name, or company name'}
+                  {isIndonesian
+                    ? 'Cari berdasarkan ID perangkat, nama lokasi, atau tipe alat'
+                    : 'Search by device ID, location name, or device type'}
                 </p>
               </div>
 
-              {/* Search Tips */}
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-2">
                 <p className="text-xs font-semibold text-blue-800">
                   {isIndonesian ? 'Tips Pencarian:' : 'Search Tips:'}
@@ -486,7 +522,6 @@ const AdvancedFilterPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = 
           )}
         </div>
 
-        {/* Footer - Action Buttons */}
         <div className="sticky bottom-0 border-t border-slate-200 bg-white p-4 flex gap-2 justify-end z-10">
           <button
             onClick={() => {

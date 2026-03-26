@@ -1,20 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import DashboardMap from '../components/DashboardMap';
 import ChartContainer from '../components/charts/ChartContainer';
-import { useDevices, usePerusahaan, useRealtimeAll } from '../services/useApi';
+import { usePublicMapAnalytics, usePublicMapDevices, usePublicMapSummary } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
-import { Device, RealtimeData } from '../types';
-import { useAuth } from '../context/AuthContext';
-
-// Helper to normalize dates by week (Monday start)
-const getWeekStart = (date: string): string => {
-  const d = new Date(date + 'T00:00:00');
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d.toISOString().split('T')[0];
-};
+import { Device } from '../types';
 
 // Helper to create readable week labels
 const formatWeekLabel = (startDate: string): string => {
@@ -26,197 +16,165 @@ const formatWeekLabel = (startDate: string): string => {
 
 const FullMap: React.FC = () => {
   const { t } = useTranslation();
-  const { filters } = useFilters();
-  const { user } = useAuth();
+  const { filters, updateFilter, setTimePeriod } = useFilters();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
+  const publicDateInitializedRef = useRef(false);
+  const publicFilterInitializedRef = useRef(false);
+
+  const getSelectedCityValue = (device: Device): string => {
+    return (
+      (typeof device.desa === 'string' && device.desa.trim()) ||
+      (typeof device.kabupaten_id === 'string' && device.kabupaten_id.trim()) ||
+      (typeof device.provinsi_id === 'string' && device.provinsi_id.trim()) ||
+      ''
+    );
+  };
+
+  const isPublicMapRoute = typeof window !== 'undefined' && (
+    window.location.hash === '#/map' ||
+    window.location.hash.startsWith('#/map?') ||
+    window.location.hash.startsWith('#/map/')
+  );
+
+  const publicLocationFilters = useMemo(() => ({
+    provinsi: filters.provinsi || '',
+    kabupaten: filters.kabupaten || '',
+    kecamatan: filters.kecamatan || '',
+    desa: filters.desa || '',
+    jenis_perusahaan: filters.jenis_perusahaan || '',
+  }), [filters.provinsi, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan]);
+
+  const publicAnalyticsFilters = useMemo(() => ({
+    ...publicLocationFilters,
+    start_date: filters.startDate || '',
+    end_date: filters.endDate || '',
+  }), [publicLocationFilters, filters.startDate, filters.endDate]);
 
   const {
-    data: allDevices,
+    data: publicSummary,
+    loading: summaryLoading,
+    error: summaryError,
+    refetch: refetchSummary,
+  } = usePublicMapSummary();
+  const {
+    data: publicDevices,
     loading: devicesLoading,
     error: devicesError,
     refetch: refetchDevices,
-  } = useDevices(user?.perusahaanId || undefined);
+  } = usePublicMapDevices(publicLocationFilters);
   const {
-    data: allPerusahaan,
-    loading: perusahaanLoading,
-    error: perusahaanError,
-    refetch: refetchPerusahaan,
-  } = usePerusahaan(user?.perusahaanId || undefined);
-  const {
-    data: realtimeData,
-    loading: realtimeLoading,
-    error: realtimeError,
-    refetch: refetchRealtime,
-  } = useRealtimeAll(user?.perusahaanId || undefined);
+    data: publicAnalytics,
+    loading: analyticsLoading,
+    error: analyticsError,
+    refetch: refetchAnalytics,
+  } = usePublicMapAnalytics(publicAnalyticsFilters);
 
-  const normalizeRegionValue = (value?: string | null): string => {
-    return (value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
-
-  const matchesRegionFilter = (filterValue: string, ...candidates: Array<string | null | undefined>): boolean => {
-    if (!filterValue) return true;
-    const target = normalizeRegionValue(filterValue);
-    return candidates.some((candidate) => normalizeRegionValue(candidate || '') === target);
-  };
-
-  // Apply filters to device list
-  const filteredDevices = useMemo(() => {
-    if (!allDevices) return [];
-
-    let filtered = allDevices;
-    if (user?.role === 'perusahaan' && user?.perusahaanId) {
-      filtered = filtered.filter((d) => d.id_perusahaan === user.perusahaanId);
+  useEffect(() => {
+    if (!isPublicMapRoute || publicFilterInitializedRef.current) {
+      return;
     }
-    if (filters.provinsi) {
-      filtered = filtered.filter((d) =>
-        matchesRegionFilter(filters.provinsi, d.provinsi_nama, d.provinsi_id, (d as any).provinsi)
-      );
-    }
-    if (filters.kabupaten) {
-      filtered = filtered.filter((d) =>
-        matchesRegionFilter(filters.kabupaten, d.kabupaten_nama, d.kabupaten_id, (d as any).kabupaten)
-      );
-    }
-    if (filters.jenis_perusahaan && allPerusahaan) {
-      const companyIds = allPerusahaan
-        .filter((p) => p.jenis_perusahaan === filters.jenis_perusahaan)
-        .map((p) => p.id);
-      filtered = filtered.filter((d) => companyIds.includes(d.id_perusahaan));
-    }
-    return filtered;
-  }, [allDevices, allPerusahaan, filters, user?.role, user?.perusahaanId]);
 
-  // Realtime data scoped to filtered devices and date range
-  const relevantRealtimeData = useMemo(() => {
-    if (!realtimeData || filteredDevices.length === 0) return [];
-    
-    let scopedDevices = filteredDevices;
-    
-    // If a city is selected, further filter devices to only those in that city
+    publicFilterInitializedRef.current = true;
+
     if (filters.selectedCity) {
-      scopedDevices = scopedDevices.filter(d => d.kota === filters.selectedCity);
+      updateFilter('selectedCity', null);
     }
-    
-    const deviceIds = new Set(scopedDevices.map((d) => d.device_id_unik));
+  }, [isPublicMapRoute, filters.selectedCity, updateFilter]);
 
-    // Check if we're on the public /map route
-    const isPublicMapRoute = typeof window !== 'undefined' && (
-      window.location.hash === '#/map' ||
-      window.location.hash.startsWith('#/map?') ||
-      window.location.hash.startsWith('#/map/')
-    );
+  useEffect(() => {
+    if (!isPublicMapRoute || publicDateInitializedRef.current || !publicSummary) {
+      return;
+    }
 
-    return realtimeData.filter((r) => {
-      if (!deviceIds.has(r.device_id_unik)) return false;
-      
-      // Skip date filtering on public /map route to show all available data
-      if (isPublicMapRoute) return true;
-      
-      // Apply date filters on other routes
-      const dataDate = r.timestamp_data.split(' ')[0];
-      const matchesStart = !filters.startDate || dataDate >= filters.startDate;
-      const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
-      return matchesStart && matchesEnd;
-    });
-  }, [realtimeData, filteredDevices, filters.startDate, filters.endDate, filters.selectedCity]);
+    if (!publicSummary.default_start_date || !publicSummary.default_end_date) {
+      return;
+    }
 
-  // Daily chart data
-  const dailyChartData = useMemo(() => {
-    if (relevantRealtimeData.length === 0) return [];
-    const dailyAggregation: Record<string, { offline: number; safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
+    publicDateInitializedRef.current = true;
+    setTimePeriod('custom');
+    updateFilter('startDate', publicSummary.default_start_date);
+    updateFilter('endDate', publicSummary.default_end_date);
+  }, [publicSummary, isPublicMapRoute, setTimePeriod, updateFilter]);
 
-    relevantRealtimeData.forEach((r: RealtimeData) => {
-      const date = r.timestamp_data.split(' ')[0];
-      if (!dailyAggregation[date]) {
-        dailyAggregation[date] = { offline: 0, safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
-      }
+  const filteredDevices = useMemo(() => {
+    if (!publicDevices) return [];
 
-      if (r.tmat_value < -0.6) {
-        dailyAggregation[date].extreme++;
-      } else if (r.tmat_value < -0.5) {
-        dailyAggregation[date].veryhigh++;
-      } else if (r.tmat_value < -0.4) {
-        dailyAggregation[date].high++;
-      } else if (r.tmat_value < -0.2) {
-        dailyAggregation[date].medium++;
-      } else if (r.tmat_value < 0) {
-        dailyAggregation[date].low++;
-      } else {
-        dailyAggregation[date].safe++;
-      }
-    });
-
-    return Object.entries(dailyAggregation)
-      .map(([date, counts]) => ({ date, ...counts }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [relevantRealtimeData]);
-
-  // Weekly chart data
-  const weeklyChartData = useMemo(() => {
-    if (relevantRealtimeData.length === 0) return [];
-    const weeklyAggregation: Record<string, { offline: number; safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number }> = {};
-
-    relevantRealtimeData.forEach((r: RealtimeData) => {
-      const date = r.timestamp_data.split(' ')[0];
-      const weekStart = getWeekStart(date);
-      if (!weeklyAggregation[weekStart]) {
-        weeklyAggregation[weekStart] = { offline: 0, safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 };
-      }
-
-      if (r.tmat_value < -0.6) {
-        weeklyAggregation[weekStart].extreme++;
-      } else if (r.tmat_value < -0.5) {
-        weeklyAggregation[weekStart].veryhigh++;
-      } else if (r.tmat_value < -0.4) {
-        weeklyAggregation[weekStart].high++;
-      } else if (r.tmat_value < -0.2) {
-        weeklyAggregation[weekStart].medium++;
-      } else if (r.tmat_value < 0) {
-        weeklyAggregation[weekStart].low++;
-      } else {
-        weeklyAggregation[weekStart].safe++;
-      }
-    });
-
-    return Object.entries(weeklyAggregation)
-      .map(([weekStart, counts]) => ({
-        date: formatWeekLabel(weekStart),
-        dateKey: weekStart,
-        ...counts,
-      }))
-      .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  }, [relevantRealtimeData]);
-
-  // TMAT trend data (last 10 readings)
-  const trendData = useMemo(() => {
-    if (relevantRealtimeData.length === 0) return [];
-    const sorted = [...relevantRealtimeData].sort(
-      (a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime()
-    );
-    return sorted.slice(-10).map((d) => ({
-      time: d.timestamp_data.split(' ')[1] || d.timestamp_data,
-      tmat: d.tmat_value,
+    return publicDevices.map((device, index) => ({
+      id: index + 1,
+      device_id_unik: device.device_id_unik,
+      id_perusahaan: device.id_perusahaan || 0,
+      tipe_alat: device.tipe_alat || '',
+      alamat: device.desa || null,
+      provinsi_id: device.provinsi_id || null,
+      kabupaten_id: device.kabupaten_id || null,
+      kecamatan_id: device.kecamatan_id || null,
+      desa: device.desa || null,
+      latitude: Number(device.latitude),
+      longitude: Number(device.longitude),
+      status: device.status,
+      last_online: device.latest_realtime?.timestamp_data || null,
+      created_at: device.latest_realtime?.timestamp_data || new Date().toISOString(),
+      kode_titik: device.kode_titik || undefined,
+      kode_blok: '',
+      provinsi_nama: device.provinsi_nama || null,
+      kabupaten_nama: device.kabupaten_nama || null,
+      kecamatan_nama: device.kecamatan_nama || null,
     }));
-  }, [relevantRealtimeData]);
+  }, [publicDevices]);
 
-  // Metrics values - Critical TMAT count based on unique devices
+  const latestRealtimeData = useMemo(() => {
+    if (!publicDevices) return [];
+
+    return publicDevices
+      .filter((device) => !!device.latest_realtime?.timestamp_data)
+      .map((device, index) => ({
+        id: index + 1,
+        device_id_unik: device.device_id_unik,
+        timestamp_data: device.latest_realtime.timestamp_data || '',
+        tmat_value: device.latest_realtime.tmat_value ?? Number.NaN,
+        suhu_value: device.latest_realtime.suhu_value ?? Number.NaN,
+        ph_value: Number.NaN,
+        curah_hujan: device.latest_realtime.curah_hujan ?? Number.NaN,
+        kelembapan: device.latest_realtime.kelembapan ?? Number.NaN,
+      }));
+  }, [publicDevices]);
+
+  useEffect(() => {
+    if (!filters.selectedCity || filteredDevices.length === 0) {
+      return;
+    }
+
+    const hasMatchingCity = filteredDevices.some((device) => getSelectedCityValue(device) === filters.selectedCity);
+    if (!hasMatchingCity) {
+      updateFilter('selectedCity', null);
+    }
+  }, [filteredDevices, filters.selectedCity, updateFilter]);
+
+  const dailyChartData = useMemo(() => {
+    return publicAnalytics?.daily || [];
+  }, [publicAnalytics]);
+
+  const weeklyChartData = useMemo(() => {
+    return (publicAnalytics?.weekly || []).map((item) => ({
+      ...item,
+      date: formatWeekLabel(item.week),
+      dateKey: item.week,
+    }));
+  }, [publicAnalytics]);
+
+  const trendData = useMemo(() => {
+    return (publicAnalytics?.trend || []).map((item) => ({
+      time: item.time,
+      tmat: item.tmat,
+    }));
+  }, [publicAnalytics]);
+
   const criticalCount = useMemo(() => {
-    const criticalDevices = new Set<string>();
-    relevantRealtimeData.forEach(r => {
-      if (r.tmat_value < -0.4) {
-        criticalDevices.add(r.device_id_unik);
-      }
-    });
-    return criticalDevices.size;
-  }, [relevantRealtimeData]);
+    return publicSummary?.critical_devices || 0;
+  }, [publicSummary]);
 
-  const isLoading = devicesLoading || perusahaanLoading || realtimeLoading;
-  const hasError = devicesError || perusahaanError || realtimeError;
+  const isLoading = summaryLoading || devicesLoading || analyticsLoading;
+  const hasError = summaryError || devicesError || analyticsError;
 
   if (isLoading) {
     return (
@@ -237,14 +195,14 @@ const FullMap: React.FC = () => {
         <div className="bg-white border border-red-200 rounded-xl p-6 shadow-sm space-y-3 max-w-md">
           <h3 className="font-bold text-red-800">Error loading data</h3>
           <p className="text-red-600">
-            {devicesError?.message || perusahaanError?.message || realtimeError?.message}
+            {summaryError?.message || devicesError?.message || analyticsError?.message}
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => {
+                refetchSummary();
                 refetchDevices();
-                refetchPerusahaan();
-                refetchRealtime();
+                refetchAnalytics();
               }}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
             >
@@ -306,7 +264,12 @@ const FullMap: React.FC = () => {
         )}
 
         <section className="space-y-3">
-          <DashboardMap devices={filteredDevices} heightClass="h-[70vh]" />
+          <DashboardMap
+            devices={filteredDevices}
+            heightClass="h-[70vh]"
+            realtimeData={latestRealtimeData}
+            realtimeLoading={devicesLoading}
+          />
         </section>
 
         {/* Charts */}

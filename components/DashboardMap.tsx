@@ -105,6 +105,15 @@ const hasValidMetric = (value: number | undefined): value is number => Number.is
 interface Props {
   devices: Device[];
   heightClass?: string;
+  realtimeData?: RealtimeData[] | null;
+  realtimeLoading?: boolean;
+}
+
+interface DashboardMapInnerProps {
+  devices: Device[];
+  heightClass?: string;
+  realtimeData: RealtimeData[] | null;
+  realtimeLoading: boolean;
 }
 
 // Component to handle automatic map bounds fitting
@@ -492,11 +501,10 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean; showDi
   );
 };
 
-const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }, ref) => {
+const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ devices, heightClass, realtimeData, realtimeLoading }, ref) => {
   const { t, i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { user } = useAuth();
-  const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(user?.perusahaanId || undefined);
   const { filters, updateFilter, enforcedProvinsi } = useFilters();
   const [legendOpen, setLegendOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -618,6 +626,15 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       .trim();
   }, []);
 
+  const extractDatePart = useCallback((timestamp: unknown): string | null => {
+    if (typeof timestamp !== 'string') return null;
+    const value = timestamp.trim();
+    if (!value) return null;
+    if (value.includes(' ')) return value.split(' ')[0] || null;
+    if (value.includes('T')) return value.split('T')[0] || null;
+    return value.length >= 10 ? value.slice(0, 10) : null;
+  }, []);
+
   const resolveProvinceLabel = useCallback((provinceValue: string) => {
     if (!provinceValue) return '';
     return provinceNameByValue.get(provinceValue) || provinceValue;
@@ -720,8 +737,6 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       if (!matchesKabupatenFilter(filters.kabupaten, device)) return false;
       if (!matchesKecamatanFilter(filters.kecamatan, device)) return false;
       if (filters.desa && device.desa && !device.desa.toLowerCase().includes(filters.desa.toLowerCase())) return false;
-      if (filters.jenis_perusahaan && device.id_perusahaan.toString() !== filters.jenis_perusahaan) return false;
-      
       // Apply search filter
       if (filters.searchText) {
         const searchLower = filters.searchText.toLowerCase();
@@ -783,11 +798,25 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
     );
   }, [devices, filteredDevices, realtimeData, realtimeLoading, showMarkers]);
 
+  const filteredRealtimeData = useMemo(() => {
+    if (!realtimeData) return null;
+
+    return realtimeData.filter((data) => {
+      const dataDate = extractDatePart(data.timestamp_data);
+      if (!dataDate) return false;
+
+      const matchesStart = !filters.startDate || dataDate >= filters.startDate;
+      const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
+
+      return matchesStart && matchesEnd;
+    });
+  }, [realtimeData, filters.startDate, filters.endDate, extractDatePart]);
+
   // Create a map of device -> latest realtime data
   const deviceDataMap = useMemo(() => {
     const map = new Map<string, RealtimeData>();
-    if (realtimeData) {
-      realtimeData.forEach(data => {
+    if (filteredRealtimeData) {
+      filteredRealtimeData.forEach(data => {
         const existing = map.get(data.device_id_unik);
         if (!existing || new Date(data.timestamp_data) > new Date(existing.timestamp_data)) {
           map.set(data.device_id_unik, data);
@@ -795,7 +824,7 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       });
     }
     return map;
-  }, [realtimeData]);
+  }, [filteredRealtimeData]);
 
   // Get realtime data for selected device
   const selectedDeviceData = useMemo(() => {
@@ -1188,7 +1217,11 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
       </div>
 
       {/* Advanced Filter Panel Modal */}
-      <AdvancedFilterPanel isOpen={advancedFilterOpen} onClose={() => setAdvancedFilterOpen(false)} />
+      <AdvancedFilterPanel
+        isOpen={advancedFilterOpen}
+        onClose={() => setAdvancedFilterOpen(false)}
+        devices={scopedDevices}
+      />
 
       {/* Selected City Banner */}
       {filters.selectedCity && (
@@ -1733,6 +1766,42 @@ const DashboardMap = forwardRef<HTMLDivElement, Props>(({ devices, heightClass }
   );
 });
 
+const DashboardMapWithRealtime = forwardRef<HTMLDivElement, Omit<Props, 'realtimeData' | 'realtimeLoading'>>(
+  ({ devices, heightClass }, ref) => {
+    const { user } = useAuth();
+    const { data: realtimeData, loading: realtimeLoading } = useRealtimeAll(user?.perusahaanId || undefined);
+
+    return (
+      <DashboardMapInner
+        ref={ref}
+        devices={devices}
+        heightClass={heightClass}
+        realtimeData={realtimeData}
+        realtimeLoading={realtimeLoading}
+      />
+    );
+  }
+);
+
+const DashboardMap = forwardRef<HTMLDivElement, Props>(({ realtimeData, realtimeLoading, ...rest }, ref) => {
+  const hasExternalRealtime = realtimeData !== undefined || realtimeLoading !== undefined;
+
+  if (hasExternalRealtime) {
+    return (
+      <DashboardMapInner
+        ref={ref}
+        {...rest}
+        realtimeData={realtimeData ?? null}
+        realtimeLoading={realtimeLoading ?? false}
+      />
+    );
+  }
+
+  return <DashboardMapWithRealtime ref={ref} {...rest} />;
+});
+
 DashboardMap.displayName = 'DashboardMap';
+DashboardMapInner.displayName = 'DashboardMapInner';
+DashboardMapWithRealtime.displayName = 'DashboardMapWithRealtime';
 
 export default DashboardMap;

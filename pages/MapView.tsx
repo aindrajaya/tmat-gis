@@ -145,7 +145,11 @@ const MapView: React.FC = () => {
       </div>
 
       <div className="h-[calc(100vh-350px)]">
-        <DashboardMap devices={filteredDevices} />
+        <DashboardMap
+          devices={filteredDevices}
+          realtimeData={realtimeData}
+          realtimeLoading={realtimeLoading}
+        />
       </div>
     </div>
   );

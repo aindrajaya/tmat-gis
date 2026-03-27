@@ -440,7 +440,7 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean; showDi
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#FFFF00] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#F2D335] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
                 {isIndonesian ? 'Tinggi' : 'High'}
@@ -1460,28 +1460,28 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
             </svg>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#703CA0]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.safe}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#00B050]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.low}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#00B0F0]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.medium}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#FFFF00]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.high}</span>
+                <div className="w-2 h-2 rounded-full bg-[#EE0000]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.extreme}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-[#FFC000]"></div>
                 <span className="text-xs font-bold text-slate-700">{stats.veryhigh}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#EE0000]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.extreme}</span>
+                <div className="w-2 h-2 rounded-full bg-[#F2D335]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.high}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#00B0F0]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.medium}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#00B050]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.low}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-[#703CA0]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.safe}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-slate-400"></div>
@@ -1519,44 +1519,15 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
             </div>
             
             <div className="space-y-2">
-              <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
-              </div>
 
-              <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Rendah' : 'Low'}
+                    {isIndonesian ? 'Ekstrim' : 'Extreme'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-green-700">{stats.low}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 bg-cyan-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Sedang' : 'Medium'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#FFFF00]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Tinggi' : 'High'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-yellow-700">{stats.high}</span>
+                <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
               </div>
 
               <div className="flex items-center justify-between p-2 bg-amber-50 rounded-lg">
@@ -1569,14 +1540,44 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
                 <span className="text-sm font-bold text-amber-700">{stats.veryhigh}</span>
               </div>
 
-              <div className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
+              <div className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#F2D335]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Ekstrim' : 'Extreme'}
+                    {isIndonesian ? 'Tinggi' : 'High'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
+                <span className="text-sm font-bold text-yellow-800">{stats.high}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 bg-cyan-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Sedang' : 'Medium'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Rendah' : 'Low'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-green-700">{stats.low}</span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
+                  <span className="text-xs font-medium text-slate-700">
+                    {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
               </div>
 
               {stats.offline > 0 && (

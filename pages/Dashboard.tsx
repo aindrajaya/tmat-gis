@@ -96,6 +96,13 @@ const Dashboard: React.FC = () => {
     return null;
   };
 
+  const getTimestampSortValue = (timestamp: unknown): number => {
+    if (typeof timestamp !== 'string') return Number.NEGATIVE_INFINITY;
+    const normalized = timestamp.trim().replace(' ', 'T');
+    const parsed = Date.parse(normalized);
+    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+  };
+
   const toDateOnly = (value: string | null | undefined): string => {
     if (!value) {
       return new Date().toISOString().split('T')[0];
@@ -297,37 +304,46 @@ const Dashboard: React.FC = () => {
         });
       }
 
+      // Charts should represent one status per active device per period.
+      // Counting every reading inflates categories on pages that fetch raw history.
+      relevantData = relevantData.filter((r) => aktifDeviceIds.includes(r.device_id_unik));
+
+      const classifyTmatValue = (value: number) => {
+        if (value < -0.6) return 'extreme' as const;
+        if (value < -0.5) return 'veryhigh' as const;
+        if (value < -0.4) return 'high' as const;
+        if (value < -0.2) return 'medium' as const;
+        if (value < 0) return 'low' as const;
+        return 'safe' as const;
+      };
+
       // DAILY AGGREGATION
       const dailyAggregation: { [date: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
-      
-      relevantData.forEach(r => {
+
+      const latestDailyByDevice = new Map<string, RealtimeData>();
+      relevantData.forEach((r) => {
+        const date = extractDatePart(r.timestamp_data);
+        if (!date) return;
+        const key = `${date}::${r.device_id_unik}`;
+        const existing = latestDailyByDevice.get(key);
+        if (!existing || getTimestampSortValue(r.timestamp_data) > getTimestampSortValue(existing.timestamp_data)) {
+          latestDailyByDevice.set(key, r);
+        }
+      });
+
+      latestDailyByDevice.forEach((r) => {
         const date = extractDatePart(r.timestamp_data);
         if (!date) return;
         if (!dailyAggregation[date]) {
           dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
         }
-        
-        // Determine condition based on TMAT value (6-level classification)
-        // Extreme: < -0.6, Very High: -0.6 to -0.5, High: -0.5 to -0.4, Medium: -0.4 to -0.2, Low: -0.2 to 0, Safe: >= 0
-        if (r.tmat_value < -0.6) {
-          dailyAggregation[date].extreme++;
-        } else if (r.tmat_value < -0.5) {
-          dailyAggregation[date].veryhigh++;
-        } else if (r.tmat_value < -0.4) {
-          dailyAggregation[date].high++;
-        } else if (r.tmat_value < -0.2) {
-          dailyAggregation[date].medium++;
-        } else if (r.tmat_value < 0) {
-          dailyAggregation[date].low++;
-        } else {
-          dailyAggregation[date].safe++;
-        }
+        dailyAggregation[date][classifyTmatValue(r.tmat_value)]++;
       });
 
       // Add offline devices count for each day
       Object.keys(dailyAggregation).forEach(date => {
         const devicesWithDataOnDate = new Set(
-          relevantData
+          Array.from(latestDailyByDevice.values())
             .filter(r => extractDatePart(r.timestamp_data) === date)
             .map(r => r.device_id_unik)
         );
@@ -344,34 +360,33 @@ const Dashboard: React.FC = () => {
 
       // WEEKLY AGGREGATION
       const weeklyAggregation: { [weekStart: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
-      
-      relevantData.forEach(r => {
+
+      const latestWeeklyByDevice = new Map<string, RealtimeData>();
+      relevantData.forEach((r) => {
+        const date = extractDatePart(r.timestamp_data);
+        if (!date) return;
+        const weekStart = getWeekStart(date);
+        const key = `${weekStart}::${r.device_id_unik}`;
+        const existing = latestWeeklyByDevice.get(key);
+        if (!existing || getTimestampSortValue(r.timestamp_data) > getTimestampSortValue(existing.timestamp_data)) {
+          latestWeeklyByDevice.set(key, r);
+        }
+      });
+
+      latestWeeklyByDevice.forEach((r) => {
         const date = extractDatePart(r.timestamp_data);
         if (!date) return;
         const weekStart = getWeekStart(date);
         if (!weeklyAggregation[weekStart]) {
           weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
         }
-        
-        if (r.tmat_value < -0.6) {
-          weeklyAggregation[weekStart].extreme++;
-        } else if (r.tmat_value < -0.5) {
-          weeklyAggregation[weekStart].veryhigh++;
-        } else if (r.tmat_value < -0.4) {
-          weeklyAggregation[weekStart].high++;
-        } else if (r.tmat_value < -0.2) {
-          weeklyAggregation[weekStart].medium++;
-        } else if (r.tmat_value < 0) {
-          weeklyAggregation[weekStart].low++;
-        } else {
-          weeklyAggregation[weekStart].safe++;
-        }
+        weeklyAggregation[weekStart][classifyTmatValue(r.tmat_value)]++;
       });
 
       // Add offline devices count for each week
       Object.keys(weeklyAggregation).forEach(weekStart => {
         const devicesWithDataInWeek = new Set(
-          relevantData
+          Array.from(latestWeeklyByDevice.values())
             .filter(r => {
               const date = extractDatePart(r.timestamp_data);
               return date ? getWeekStart(date) === weekStart : false;

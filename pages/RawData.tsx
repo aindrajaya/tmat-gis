@@ -37,9 +37,14 @@ const TableRow = memo(({ row, t }: TableRowProps) => (
 
 const RawData: React.FC = () => {
   const { t } = useTranslation();
-  const { filters, enforcedProvinsi } = useFilters();
+  const { filters, enforcedProvinsi, updateFilter } = useFilters();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const visibleFilterTabs = useMemo(() => {
+    if (user?.role === 'perusahaan') return ['date'] as const;
+    if (user?.role === 'pemda') return ['location', 'date'] as const;
+    return ['location', 'date', 'search'] as const;
+  }, [user?.role]);
   
   // Fetch realtime snapshot (latest data)
   const {
@@ -110,7 +115,29 @@ const RawData: React.FC = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const lastAppliedRoleRef = useRef<string | undefined>(undefined);
   const pageSize = 50;
+
+  useEffect(() => {
+    if (lastAppliedRoleRef.current === user?.role) {
+      return;
+    }
+    lastAppliedRoleRef.current = user?.role;
+
+    if (user?.role === 'perusahaan') {
+      updateFilter('provinsi', '');
+      updateFilter('kabupaten', '');
+      updateFilter('kecamatan', '');
+      updateFilter('desa', '');
+      updateFilter('jenis_perusahaan', '');
+      updateFilter('searchText', '');
+      return;
+    }
+
+    if (user?.role === 'pemda') {
+      updateFilter('searchText', '');
+    }
+  }, [user?.role]);
 
   // Manual refresh function to invalidate cache
   const handleRefresh = useCallback(() => {
@@ -697,7 +724,12 @@ const RawData: React.FC = () => {
         </div>
 
         {/* Advanced Filter Panel Modal */}
-        <AdvancedFilterPanel isOpen={filterOpen} onClose={() => setFilterOpen(false)} />
+        <AdvancedFilterPanel
+          isOpen={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          devices={filteredDevices}
+          visibleTabs={[...visibleFilterTabs]}
+        />
         
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">

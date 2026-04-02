@@ -506,6 +506,11 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
   const isIndonesian = i18n.language === 'id';
   const { user } = useAuth();
   const { filters, updateFilter, enforcedProvinsi } = useFilters();
+  const visibleFilterTabs = useMemo(() => {
+    if (user?.role === 'perusahaan') return ['date'] as const;
+    if (user?.role === 'pemda') return ['location', 'date'] as const;
+    return ['location', 'date', 'search'] as const;
+  }, [user?.role]);
   const [legendOpen, setLegendOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -515,6 +520,7 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
   const [isExpanded, setIsExpanded] = useState(false);
   const [basemapOpen, setBasemapOpen] = useState(false);
   const [selectedBasemap, setSelectedBasemap] = useState<'osm' | 'satellite' | 'dark'>('osm');
+  const lastAppliedRoleRef = useRef<string | undefined>(undefined);
   
   // Toggle settings
   const [showDistrictLayer, setShowDistrictLayer] = useState(false);
@@ -524,6 +530,27 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
   // This persists across toggle on/off to avoid recalculation
   const villageOverlapCacheRef = useRef<Map<string | number, any>>(new Map());
   const [isCalculatingVillages, setIsCalculatingVillages] = useState(false);
+
+  useEffect(() => {
+    if (lastAppliedRoleRef.current === user?.role) {
+      return;
+    }
+    lastAppliedRoleRef.current = user?.role;
+
+    if (user?.role === 'perusahaan') {
+      updateFilter('provinsi', '');
+      updateFilter('kabupaten', '');
+      updateFilter('kecamatan', '');
+      updateFilter('desa', '');
+      updateFilter('jenis_perusahaan', '');
+      updateFilter('searchText', '');
+      return;
+    }
+
+    if (user?.role === 'pemda') {
+      updateFilter('searchText', '');
+    }
+  }, [user?.role]);
 
   // Memoized event handlers to prevent re-creation on every render
   const handleDeviceSelect = useCallback((device: Device | null) => {
@@ -1221,6 +1248,7 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
         isOpen={advancedFilterOpen}
         onClose={() => setAdvancedFilterOpen(false)}
         devices={scopedDevices}
+        visibleTabs={[...visibleFilterTabs]}
       />
 
       {/* Selected City Banner */}

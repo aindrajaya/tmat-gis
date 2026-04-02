@@ -1,21 +1,33 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Filter, X } from 'lucide-react';
 import { useFilters } from '../context/FilterContext';
 import { Device } from '../types';
 
+type AdvancedFilterTab = 'location' | 'date' | 'search';
+
 interface AdvancedFilterPanelProps {
   isOpen: boolean;
   onClose: () => void;
   devices?: Device[];
+  visibleTabs?: AdvancedFilterTab[];
 }
 
-const AdvancedFilterPanel: React.FC<AdvancedFilterPanelProps> = ({ isOpen, onClose, devices }) => {
+const DEFAULT_VISIBLE_TABS: AdvancedFilterTab[] = ['location', 'date', 'search'];
+
+const AdvancedFilterPanel: React.FC<AdvancedFilterPanelProps> = ({ isOpen, onClose, devices, visibleTabs = DEFAULT_VISIBLE_TABS }) => {
   const { i18n } = useTranslation();
   const isIndonesian = i18n.language === 'id';
   const { filters, updateFilter, setTimePeriod, resetFilters, enforcedProvinsi } = useFilters();
-  const [activeTab, setActiveTab] = useState<'location' | 'date' | 'search'>('location');
+  const availableTabs = visibleTabs.length > 0 ? visibleTabs : DEFAULT_VISIBLE_TABS;
+  const [activeTab, setActiveTab] = useState<AdvancedFilterTab>(availableTabs[0]);
   const sourceDevices = devices ?? [];
+
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    }
+  }, [activeTab, availableTabs]);
 
   const getProvinceValue = useCallback((device: Device) => (device.provinsi_nama || device.provinsi_id || '').trim(), []);
   const getKabupatenValue = useCallback((device: Device) => (device.kabupaten_nama || device.kabupaten_id || '').trim(), []);
@@ -235,36 +247,42 @@ const AdvancedFilterPanel: React.FC<AdvancedFilterPanelProps> = ({ isOpen, onClo
         </div>
 
         <div className="flex border-b border-slate-200 bg-slate-50 sticky top-[73px] z-10">
-          <button
-            onClick={() => setActiveTab('location')}
-            className={`flex-1 py-3 px-4 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'location'
-                ? 'border-emerald-500 text-emerald-600 bg-white'
-                : 'border-transparent text-slate-600 hover:text-slate-800'
-            }`}
-          >
-            {isIndonesian ? 'Lokasi' : 'Location'}
-          </button>
-          <button
-            onClick={() => setActiveTab('date')}
-            className={`flex-1 py-3 px-4 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'date'
-                ? 'border-emerald-500 text-emerald-600 bg-white'
-                : 'border-transparent text-slate-600 hover:text-slate-800'
-            }`}
-          >
-            {isIndonesian ? 'Tanggal' : 'Date Range'}
-          </button>
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`flex-1 py-3 px-4 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'search'
-                ? 'border-emerald-500 text-emerald-600 bg-white'
-                : 'border-transparent text-slate-600 hover:text-slate-800'
-            }`}
-          >
-            {isIndonesian ? 'Pencarian' : 'Search'}
-          </button>
+          {availableTabs.includes('location') && (
+            <button
+              onClick={() => setActiveTab('location')}
+              className={`flex-1 py-3 px-4 font-medium text-sm transition-colors border-b-2 ${
+                activeTab === 'location'
+                  ? 'border-emerald-500 text-emerald-600 bg-white'
+                  : 'border-transparent text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              {isIndonesian ? 'Lokasi' : 'Location'}
+            </button>
+          )}
+          {availableTabs.includes('date') && (
+            <button
+              onClick={() => setActiveTab('date')}
+              className={`flex-1 py-3 px-4 font-medium text-sm transition-colors border-b-2 ${
+                activeTab === 'date'
+                  ? 'border-emerald-500 text-emerald-600 bg-white'
+                  : 'border-transparent text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              {isIndonesian ? 'Tanggal' : 'Date Range'}
+            </button>
+          )}
+          {availableTabs.includes('search') && (
+            <button
+              onClick={() => setActiveTab('search')}
+              className={`flex-1 py-3 px-4 font-medium text-sm transition-colors border-b-2 ${
+                activeTab === 'search'
+                  ? 'border-emerald-500 text-emerald-600 bg-white'
+                  : 'border-transparent text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              {isIndonesian ? 'Pencarian' : 'Search'}
+            </button>
+          )}
         </div>
 
         <div className="p-6 space-y-6">

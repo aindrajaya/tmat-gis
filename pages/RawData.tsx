@@ -115,9 +115,15 @@ const RawData: React.FC = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const lastAppliedRoleRef = useRef<string | undefined>(undefined);
   const pageSize = 50;
 
   useEffect(() => {
+    if (lastAppliedRoleRef.current === user?.role) {
+      return;
+    }
+    lastAppliedRoleRef.current = user?.role;
+
     if (user?.role === 'perusahaan') {
       updateFilter('provinsi', '');
       updateFilter('kabupaten', '');
@@ -131,7 +137,7 @@ const RawData: React.FC = () => {
     if (user?.role === 'pemda') {
       updateFilter('searchText', '');
     }
-  }, [user?.role, updateFilter]);
+  }, [user?.role]);
 
   // Manual refresh function to invalidate cache
   const handleRefresh = useCallback(() => {
@@ -721,6 +727,7 @@ const RawData: React.FC = () => {
         <AdvancedFilterPanel
           isOpen={filterOpen}
           onClose={() => setFilterOpen(false)}
+          devices={filteredDevices}
           visibleTabs={[...visibleFilterTabs]}
         />
         

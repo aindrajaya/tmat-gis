@@ -4,7 +4,6 @@ import { Device, RealtimeData } from '../types';
 import { useAPIClient, useRealtimeAll, usePerusahaan } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
-import TMATTrendChart from './charts/TMATTrendChart';
 import { X, ChevronUp, MapPin, Droplet, Thermometer, CloudRain, Waves } from 'lucide-react';
 import { getWaterLevelStatus } from '../utils/waterLevelStatus';
 import {
@@ -37,6 +36,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
   const [historicalData, setHistoricalData] = useState<RealtimeData[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<Error | null>(null);
+  const [activeChartTab, setActiveChartTab] = useState<'combined' | 'tmat' | 'rainfall' | 'humidity'>('combined');
 
   const resolveDate = (value?: string): string => {
     if (value && value.trim()) return value;
@@ -53,14 +53,14 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
     const parsed = new Date(normalized);
 
     if (Number.isNaN(parsed.getTime())) {
-      return raw; // show raw string instead of "Invalid Date"
+      return raw;
     }
 
     return parsed.toLocaleString(isIndonesian ? 'id-ID' : 'en-US');
   };
 
   const formatMetric = (value: number | undefined, digits: number, suffix = ''): string => {
-    return Number.isFinite(value) ? `${value!.toFixed(digits)}${suffix}` : '—';
+    return Number.isFinite(value) ? `${value!.toFixed(digits)}${suffix}` : '-';
   };
 
   const companyNameById = useMemo(() => {
@@ -153,7 +153,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
 
     const byDay = new Map<string, { date: string; rainSum: number; humiditySum: number; humidityCount: number; count: number }>();
 
-    historicalData.forEach((row) => {
+    historicalData.forEach((row: RealtimeData) => {
       const parsed = parseTimestamp(row.timestamp_data);
       if (!parsed) return;
 
@@ -189,13 +189,29 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
       }));
   }, [historicalData, isIndonesian]);
 
-  const combinedDailyChartData = useMemo(() => {
-    return dailySummaryData.map((item) => ({
-      date: item.date,
-      rainfall: item.curah_hujan,
-      humidity: item.kelembapan,
-    }));
-  }, [dailySummaryData]);
+  const chartSeriesData = useMemo(() => {
+    if (!historicalData.length) return [];
+
+    return [...historicalData]
+      .sort((a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime())
+      .map((item: RealtimeData) => {
+        const parsed = parseTimestamp(item.timestamp_data);
+        return {
+          time: parsed
+            ? parsed.toLocaleString(isIndonesian ? 'id-ID' : 'en-US', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : item.timestamp_data,
+          tmat: item.tmat_value,
+          rainfall: item.curah_hujan,
+          humidity: item.kelembapan,
+          fullTimestamp: item.timestamp_data,
+        };
+      });
+  }, [historicalData, isIndonesian]);
 
   useEffect(() => {
     let cancelled = false;
@@ -236,7 +252,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
         }
 
         const seen = new Set<string>();
-        const deduped = rows.filter((row) => {
+        const deduped = rows.filter((row: RealtimeData) => {
           const key = `${row.id ?? ''}|${row.device_id_unik}|${row.timestamp_data}`;
           if (seen.has(key)) return false;
           seen.add(key);
@@ -244,7 +260,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
         });
 
         deduped.sort(
-          (a, b) =>
+          (a: RealtimeData, b: RealtimeData) =>
             new Date(a.timestamp_data).getTime() -
             new Date(b.timestamp_data).getTime()
         );
@@ -276,32 +292,6 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
     historyEndDate,
     user?.perusahaanId,
   ]);
-
-  // Format historical data for chart if available
-  const trendChartData = useMemo(() => {
-    if (!historicalData || historicalData.length === 0) {
-      return [];
-    }
-
-    return [...historicalData]
-      .sort((a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime())
-      .map(data => {
-      const formattedDate = new Date(data.timestamp_data).toLocaleDateString(isIndonesian ? 'id-ID' : 'en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      return {
-        time: formattedDate, // Required by TMATTrendChart XAxis
-        date: formattedDate,
-        tmat: data.tmat_value,
-        temperature: data.suhu_value,
-        ph: data.ph_value,
-        fullTimestamp: data.timestamp_data
-      };
-    });
-  }, [historicalData, isIndonesian]);
 
   const selectedDeviceSnapshot = useMemo(() => {
     if (!selectedDevice?.device_id_unik || !realtimeSnapshotData?.length) return null;
@@ -526,59 +516,39 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
               )}
             </div>
 
-            {/* Combined Daily Chart */}
+            {/* Tabbed Chart Section */}
             <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <CloudRain size={14} className="text-blue-600" />
-                {t('dashboard:analytics.combinedChart')}
-              </h4>
-              {combinedDailyChartData.length > 0 ? (
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={combinedDailyChartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="date" fontSize={11} />
-                      <YAxis yAxisId="left" fontSize={11} label={{ value: t('dashboard:analytics.dailyRainfallAxis'), angle: -90, position: 'insideLeft' }} />
-                      <YAxis yAxisId="right" orientation="right" fontSize={11} label={{ value: t('dashboard:analytics.dailyHumidityAxis'), angle: 90, position: 'insideRight' }} />
-                      <RechartsTooltip />
-                      <Legend />
-                      <Bar yAxisId="left" dataKey="rainfall" fill="#10b981" name={t('dashboard:analytics.dailyRainfall')} radius={[4, 4, 0, 0]} />
-                      <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} name={t('dashboard:analytics.dailyHumidity')} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500">{t('dashboard:analytics.noHistoricalData')}</p>
-              )}
-            </div>
-
-            {/* Historical Data Section */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-emerald-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                {t('dashboard:analytics.historicalData')}
-                <span className="ml-2 text-[10px] font-medium text-slate-500">
+              <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                <h4 className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                  <CloudRain size={14} className="text-blue-600" />
+                  {t('dashboard:analytics.chartSection')}
+                </h4>
+                <span className="text-[10px] font-medium text-slate-500">
                   {historyStartDate} - {historyEndDate}
                 </span>
-              </h4>
+              </div>
 
-              {!historyLoading && !historyError && (
-                <div className="mb-3 text-[11px] text-slate-500">
-                  Total records loaded: <span className="font-semibold text-slate-700">{historicalData.length}</span>
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {([
+                  ['combined', t('dashboard:analytics.chartTabs.combined')] as const,
+                  ['tmat', t('dashboard:analytics.chartTabs.tmat')] as const,
+                  ['rainfall', t('dashboard:analytics.chartTabs.rainfall')] as const,
+                  ['humidity', t('dashboard:analytics.chartTabs.humidity')] as const,
+                ]).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveChartTab(tab)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition ${
+                      activeChartTab === tab
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
               {historyLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -593,9 +563,50 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     {historyError.message}
                   </p>
                 </div>
-              ) : trendChartData.length > 0 ? (
-                <div className="bg-white rounded-lg border border-slate-100 p-4">
-                  <TMATTrendChart data={trendChartData} selectedCity={filters.selectedCity || undefined} />
+              ) : chartSeriesData.length > 0 ? (
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {activeChartTab === 'combined' ? (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis yAxisId="left" fontSize={11} label={{ value: 'TMAT (cm)', angle: -90, position: 'insideLeft' }} />
+                        <YAxis yAxisId="right" orientation="right" fontSize={11} label={{ value: 'Curah Hujan / Kelembapan', angle: 90, position: 'insideRight' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line yAxisId="left" type="monotone" dataKey="tmat" stroke="#3b82f6" strokeWidth={2} dot={false} name="TMAT" />
+                        <Bar yAxisId="right" dataKey="rainfall" fill="#10b981" name={t('dashboard:analytics.dailyRainfall')} radius={[4, 4, 0, 0]} />
+                        <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="#f97316" strokeWidth={2} dot={false} name={t('dashboard:analytics.dailyHumidity')} />
+                      </ComposedChart>
+                    ) : activeChartTab === 'tmat' ? (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis fontSize={11} label={{ value: 'TMAT (cm)', angle: -90, position: 'insideLeft' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="tmat" stroke="#3b82f6" strokeWidth={2} dot={false} name="TMAT" />
+                      </ComposedChart>
+                    ) : activeChartTab === 'rainfall' ? (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis fontSize={11} label={{ value: 'Curah Hujan (mm)', angle: -90, position: 'insideLeft' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Bar dataKey="rainfall" fill="#10b981" name={t('dashboard:analytics.dailyRainfall')} radius={[4, 4, 0, 0]} />
+                      </ComposedChart>
+                    ) : (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis fontSize={11} label={{ value: 'Kelembapan (%)', angle: -90, position: 'insideLeft' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="humidity" stroke="#f97316" strokeWidth={2} dot={false} name={t('dashboard:analytics.dailyHumidity')} />
+                      </ComposedChart>
+                    )}
+                  </ResponsiveContainer>
                 </div>
               ) : (
                 <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 text-center">

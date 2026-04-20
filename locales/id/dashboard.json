@@ -40,7 +40,7 @@
     "safe": "Aman (> -0.4m)",
     "warning": "Peringatan",
     "danger": "Bahaya (< -0.8m)",
-    "tmatTrend": "Tren TMAT (Perangkat Sampel)",
+    "tmatTrend": "Tren TMAT",
     "download": "Unduh",
     "downloadData": "Unduh Data Analitik",
     "downloadDaily": "Unduh Data Harian (CSV)",
@@ -67,6 +67,13 @@
     "dailyRainfallAxis": "Curah Hujan (mm)",
     "dailyHumidityAxis": "Kelembapan (%)",
     "combinedChart": "Grafik Gabungan Harian",
+    "chartSection": "Grafik Historis",
+    "chartTabs": {
+      "combined": "Gabungan",
+      "tmat": "TMAT",
+      "rainfall": "Curah Hujan",
+      "humidity": "Kelembapan"
+    },
     "date": "Tanggal",
     "loading": "Memuat data...",
     "noHistoricalData": "Tidak ada data historis tersedia untuk rentang tanggal yang dipilih",

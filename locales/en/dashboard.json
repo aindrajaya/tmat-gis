@@ -40,7 +40,7 @@
     "safe": "Safe (> -0.4m)",
     "warning": "Warning",
     "danger": "Danger (< -0.8m)",
-    "tmatTrend": "TMAT Trend (Sample Devices)",
+    "tmatTrend": "TMAT Trend",
     "download": "Download",
     "downloadData": "Download Analytics Data",
     "downloadDaily": "Download Daily Data (CSV)",
@@ -67,6 +67,13 @@
     "dailyRainfallAxis": "Rainfall (mm)",
     "dailyHumidityAxis": "Humidity (%)",
     "combinedChart": "Daily Combined Chart",
+    "chartSection": "Historical Chart",
+    "chartTabs": {
+      "combined": "Combined",
+      "tmat": "TMAT",
+      "rainfall": "Rainfall",
+      "humidity": "Humidity"
+    },
     "date": "Date",
     "loading": "Loading data...",
     "noHistoricalData": "No historical data available for the selected date range",

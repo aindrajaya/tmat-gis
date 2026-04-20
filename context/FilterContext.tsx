@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { FilterState } from '../types';
 import { usePerusahaan } from '../services/useApi';
 import { useAuth } from './AuthContext';
+import { getCurrentApiMode } from '../services/apiConfig';
 
 interface FilterContextType {
   filters: FilterState;
@@ -74,7 +75,7 @@ const FilterContext = createContext<FilterContextType | undefined>(undefined);
 export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [filters, setFilters] = useState<FilterState>(buildDefaultFilters());
   const [apiMode, setApiMode] = useState<'dev' | 'prod'>(
-    (import.meta.env.VITE_API_MODE as 'dev' | 'prod') || 'dev'
+    getCurrentApiMode()
   );
   const { user } = useAuth();
   const [enforcedProvinsi, setEnforcedProvinsi] = useState<string | null>(null);

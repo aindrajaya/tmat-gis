@@ -46,6 +46,29 @@ const VillageVoronoiLayer: React.FC<VillageVoronoiLayerProps> = React.memo(({
   const map = useMap();
   const [currentZoom, setCurrentZoom] = useState(map.getZoom());
   const hoverIdRef = useRef<string | number | null>(null);
+
+  const cleanLocationText = (value?: string | null): string => {
+    if (typeof value !== 'string') return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return trimmed.split(',')[0]?.trim() || trimmed;
+  };
+
+  const joinLocationParts = (...values: Array<string | null | undefined>): string => {
+    const seen = new Set<string>();
+    const parts: string[] = [];
+
+    values.forEach((value) => {
+      const normalized = cleanLocationText(value || '');
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      parts.push(normalized);
+    });
+
+    return parts.join(', ') || 'Unknown';
+  };
   
   // Use provided cache from parent (persistent) or create new one (fallback)
   const overlapCacheRef = useRef<Map<string | number, OverlapResult>>(overlapCache || new Map());
@@ -442,10 +465,10 @@ const VillageVoronoiLayer: React.FC<VillageVoronoiLayerProps> = React.memo(({
       let popupContent = `
         <div class="p-3 min-w-[280px]">
           <h3 class="font-bold text-slate-800 text-base mb-1">
-            ${village || subDistrict || district || province || isIndonesian ? 'Wilayah Tidak Dikenal' : 'Unknown Area'}
+            ${(village || subDistrict || district || province) ? cleanLocationText(village || subDistrict || district || province || '') : (isIndonesian ? 'Wilayah Tidak Dikenal' : 'Unknown Area')}
           </h3>
           <p class="text-xs text-slate-500 mb-3">
-            ${[subDistrict, district, province].filter(Boolean).join(', ')}
+            ${joinLocationParts(subDistrict, district, province)}
           </p>
       `;
 
@@ -501,7 +524,7 @@ const VillageVoronoiLayer: React.FC<VillageVoronoiLayerProps> = React.memo(({
                 <span class="text-xs text-slate-600">
                   ${isIndonesian ? 'Lokasi' : 'Location'}:
                 </span>
-                <span class="text-xs font-medium text-slate-800">${[device.desa, device.kabupaten_id, device.provinsi_id].filter(Boolean).join(', ') || 'Unknown'}</span>
+                <span class="text-xs font-medium text-slate-800">${joinLocationParts(device.kelurahan_nama, device.desa, device.kecamatan_nama, device.kabupaten_nama, device.provinsi_nama, device.kabupaten_id, device.provinsi_id)}</span>
               </div>
 
               ${voronoiData.rtData ? `

@@ -1,12 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Device, RealtimeData } from '../types';
-import { useAPIClient, useRealtimeAll } from '../services/useApi';
+import { useAPIClient, useRealtimeAll, usePerusahaan } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { useAuth } from '../context/AuthContext';
-import TMATTrendChart from './charts/TMATTrendChart';
 import { X, ChevronUp, MapPin, Droplet, Thermometer, CloudRain, Waves } from 'lucide-react';
 import { getWaterLevelStatus } from '../utils/waterLevelStatus';
+import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 interface Props {
   selectedDevice: Device | null;
@@ -20,11 +30,13 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
   const { filters } = useFilters();
   const { user } = useAuth();
   const apiClient = useAPIClient();
+  const { data: perusahaanList } = usePerusahaan(user?.perusahaanId || undefined);
   const { data: realtimeSnapshotData } = useRealtimeAll(user?.perusahaanId || undefined);
   const [isExpanded, setIsExpanded] = useState(false);
   const [historicalData, setHistoricalData] = useState<RealtimeData[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<Error | null>(null);
+  const [activeChartTab, setActiveChartTab] = useState<'combined' | 'tmat' | 'rainfall' | 'humidity'>('combined');
 
   const resolveDate = (value?: string): string => {
     if (value && value.trim()) return value;
@@ -41,23 +53,165 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
     const parsed = new Date(normalized);
 
     if (Number.isNaN(parsed.getTime())) {
-      return raw; // show raw string instead of "Invalid Date"
+      return raw;
     }
 
     return parsed.toLocaleString(isIndonesian ? 'id-ID' : 'en-US');
   };
 
   const formatMetric = (value: number | undefined, digits: number, suffix = ''): string => {
-    return Number.isFinite(value) ? `${value!.toFixed(digits)}${suffix}` : '—';
+    return Number.isFinite(value) ? `${value!.toFixed(digits)}${suffix}` : '-';
   };
 
+  const companyNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    (perusahaanList || []).forEach((company: any) => {
+      const companyId = Number(company?.id);
+      if (Number.isFinite(companyId)) {
+        map.set(companyId, String(company?.nama_perusahaan || company?.company_name || company?.name || ''));
+      }
+    });
+    return map;
+  }, [perusahaanList]);
+
+  const selectedCompanyName = useMemo(() => {
+    if (!selectedDevice?.id_perusahaan) return '-';
+    return companyNameById.get(Number(selectedDevice.id_perusahaan)) || '-';
+  }, [companyNameById, selectedDevice?.id_perusahaan]);
+
   const getDeviceDisplayLabel = (device: Device): string => {
-    return `Device ${device.kode_titik || device.device_id_unik}`;
+    return `Nomor Titik ${device.kode_titik || device.device_id_unik}`;
+  };
+
+  const cleanLocationText = (value?: string | null): string => {
+    if (typeof value !== 'string') return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return trimmed.split(',')[0]?.trim() || trimmed;
+  };
+
+  const joinLocationParts = (...values: Array<string | null | undefined>): string => {
+    const seen = new Set<string>();
+    const parts: string[] = [];
+
+    values.forEach((value) => {
+      const normalized = cleanLocationText(value || '');
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      parts.push(normalized);
+    });
+
+    return parts.join(', ') || '-';
+  };
+
+  const cleanAddressText = (value?: string | null): string => {
+    if (typeof value !== 'string') return '-';
+
+    const parts = value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (parts.length === 0) return '-';
+
+    const cleaned: string[] = [];
+    const seen = new Set<string>();
+
+    for (const part of parts) {
+      const key = part.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      cleaned.push(part);
+
+      // Keep the address readable by limiting very long breadcrumb-like strings.
+      if (cleaned.length >= 4) break;
+    }
+
+    return cleaned.join(', ') || '-';
   };
 
   const getDeviceLocationLabel = (device: Device): string => {
-    return [device.desa, device.kabupaten_id, device.provinsi_id].filter(Boolean).join(', ') || '-';
+    return joinLocationParts(
+      device.kelurahan_nama || device.desa || device.kelurahan_id,
+      device.kecamatan_nama || device.kecamatan_id,
+      device.kabupaten_nama || device.kabupaten_id,
+      device.provinsi_nama || device.provinsi_id,
+    );
   };
+
+  const parseTimestamp = (value?: string): Date | null => {
+    if (!value || !value.trim()) return null;
+    const normalized = value.trim().includes(' ') ? value.trim().replace(' ', 'T') : value.trim();
+    const parsed = new Date(normalized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const dailySummaryData = useMemo(() => {
+    if (!historicalData.length) return [];
+
+    const byDay = new Map<string, { date: string; rainSum: number; humiditySum: number; humidityCount: number; count: number }>();
+
+    historicalData.forEach((row: RealtimeData) => {
+      const parsed = parseTimestamp(row.timestamp_data);
+      if (!parsed) return;
+
+      const dayKey = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+      const existing = byDay.get(dayKey) || {
+        date: parsed.toLocaleDateString(isIndonesian ? 'id-ID' : 'en-US', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        }),
+        rainSum: 0,
+        humiditySum: 0,
+        humidityCount: 0,
+        count: 0,
+      };
+
+      existing.rainSum += Number(row.curah_hujan || 0);
+      if (Number.isFinite(Number(row.kelembapan))) {
+        existing.humiditySum += Number(row.kelembapan);
+        existing.humidityCount += 1;
+      }
+      existing.count += 1;
+      byDay.set(dayKey, existing);
+    });
+
+    return Array.from(byDay.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, item]) => ({
+        date: item.date,
+        curah_hujan: Number(item.rainSum.toFixed(2)),
+        kelembapan: item.humidityCount > 0 ? Number((item.humiditySum / item.humidityCount).toFixed(2)) : null,
+        records: item.count,
+      }));
+  }, [historicalData, isIndonesian]);
+
+  const chartSeriesData = useMemo(() => {
+    if (!historicalData.length) return [];
+
+    return [...historicalData]
+      .sort((a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime())
+      .map((item: RealtimeData) => {
+        const parsed = parseTimestamp(item.timestamp_data);
+        return {
+          time: parsed
+            ? parsed.toLocaleString(isIndonesian ? 'id-ID' : 'en-US', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : item.timestamp_data,
+          tmat: item.tmat_value,
+          rainfall: item.curah_hujan,
+          humidity: item.kelembapan,
+          fullTimestamp: item.timestamp_data,
+        };
+      });
+  }, [historicalData, isIndonesian]);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +252,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
         }
 
         const seen = new Set<string>();
-        const deduped = rows.filter((row) => {
+        const deduped = rows.filter((row: RealtimeData) => {
           const key = `${row.id ?? ''}|${row.device_id_unik}|${row.timestamp_data}`;
           if (seen.has(key)) return false;
           seen.add(key);
@@ -106,7 +260,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
         });
 
         deduped.sort(
-          (a, b) =>
+          (a: RealtimeData, b: RealtimeData) =>
             new Date(a.timestamp_data).getTime() -
             new Date(b.timestamp_data).getTime()
         );
@@ -138,32 +292,6 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
     historyEndDate,
     user?.perusahaanId,
   ]);
-
-  // Format historical data for chart if available
-  const trendChartData = useMemo(() => {
-    if (!historicalData || historicalData.length === 0) {
-      return [];
-    }
-
-    return [...historicalData]
-      .sort((a, b) => new Date(a.timestamp_data).getTime() - new Date(b.timestamp_data).getTime())
-      .map(data => {
-      const formattedDate = new Date(data.timestamp_data).toLocaleDateString(isIndonesian ? 'id-ID' : 'en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      return {
-        time: formattedDate, // Required by TMATTrendChart XAxis
-        date: formattedDate,
-        tmat: data.tmat_value,
-        temperature: data.suhu_value,
-        ph: data.ph_value,
-        fullTimestamp: data.timestamp_data
-      };
-    });
-  }, [historicalData, isIndonesian]);
 
   const selectedDeviceSnapshot = useMemo(() => {
     if (!selectedDevice?.device_id_unik || !realtimeSnapshotData?.length) return null;
@@ -328,33 +456,99 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
               </div>
             )}
 
-            {/* Historical Data Section */}
-            <div>
+            {/* Daily Rainfall and Humidity Summary */}
+            <div className="bg-white rounded-lg border border-slate-200 p-4">
               <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-emerald-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                {t('dashboard:analytics.historicalData')}
-                <span className="ml-2 text-[10px] font-medium text-slate-500">
-                  {historyStartDate} - {historyEndDate}
-                </span>
+                <CloudRain size={14} className="text-blue-600" />
+                {t('dashboard:analytics.dailySummary')}
               </h4>
 
-              {!historyLoading && !historyError && (
-                <div className="mb-3 text-[11px] text-slate-500">
-                  Total records loaded: <span className="font-semibold text-slate-700">{historicalData.length}</span>
+              {dailySummaryData.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[11px] text-slate-500 mb-1">{t('dashboard:analytics.dailyRainfall')}</p>
+                      <p className="text-sm font-bold text-slate-800">
+                        {formatMetric(dailySummaryData.reduce((total, item) => total + item.curah_hujan, 0), 2, ' mm')}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[11px] text-slate-500 mb-1">{t('dashboard:analytics.dailyHumidity')}</p>
+                      <p className="text-sm font-bold text-slate-800">
+                        {formatMetric(
+                          dailySummaryData.reduce((total, item) => total + (item.kelembapan || 0), 0) / Math.max(dailySummaryData.filter((item) => item.kelembapan !== null).length, 1),
+                          2,
+                          ' %'
+                        )}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-[11px] text-slate-500 mb-1">{t('dashboard:analytics.dailyRecords')}</p>
+                      <p className="text-sm font-bold text-slate-800">{historicalData.length.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-slate-600">
+                      <thead className="bg-slate-50 text-slate-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left">{t('dashboard:analytics.date')}</th>
+                          <th className="px-3 py-2 text-right">{t('dashboard:analytics.dailyRainfall')}</th>
+                          <th className="px-3 py-2 text-right">{t('dashboard:analytics.dailyHumidity')}</th>
+                          <th className="px-3 py-2 text-right">{t('dashboard:analytics.dailyRecords')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {dailySummaryData.slice(-7).map((item) => (
+                          <tr key={item.date}>
+                            <td className="px-3 py-2">{item.date}</td>
+                            <td className="px-3 py-2 text-right">{formatMetric(item.curah_hujan, 2, ' mm')}</td>
+                            <td className="px-3 py-2 text-right">{formatMetric(item.kelembapan ?? undefined, 2, ' %')}</td>
+                            <td className="px-3 py-2 text-right">{item.records}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+              ) : (
+                <p className="text-xs text-slate-500">{t('dashboard:analytics.noHistoricalData')}</p>
               )}
+            </div>
+
+            {/* Tabbed Chart Section */}
+            <div className="bg-white rounded-lg border border-slate-200 p-4">
+              <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                <h4 className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                  <CloudRain size={14} className="text-blue-600" />
+                  {t('dashboard:analytics.chartSection')}
+                </h4>
+                <span className="text-[10px] font-medium text-slate-500">
+                  {historyStartDate} - {historyEndDate}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                {([
+                  ['combined', t('dashboard:analytics.chartTabs.combined')] as const,
+                  ['tmat', t('dashboard:analytics.chartTabs.tmat')] as const,
+                  ['rainfall', t('dashboard:analytics.chartTabs.rainfall')] as const,
+                  ['humidity', t('dashboard:analytics.chartTabs.humidity')] as const,
+                ]).map(([tab, label]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveChartTab(tab)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition ${
+                      activeChartTab === tab
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
               {historyLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -369,9 +563,50 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                     {historyError.message}
                   </p>
                 </div>
-              ) : trendChartData.length > 0 ? (
-                <div className="bg-white rounded-lg border border-slate-100 p-4">
-                  <TMATTrendChart data={trendChartData} selectedCity={filters.selectedCity || undefined} />
+              ) : chartSeriesData.length > 0 ? (
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {activeChartTab === 'combined' ? (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis yAxisId="left" fontSize={11} label={{ value: 'TMAT (cm)', angle: -90, position: 'insideLeft' }} />
+                        <YAxis yAxisId="right" orientation="right" fontSize={11} label={{ value: 'Curah Hujan / Kelembapan', angle: 90, position: 'insideRight' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line yAxisId="left" type="monotone" dataKey="tmat" stroke="#3b82f6" strokeWidth={2} dot={false} name="TMAT" />
+                        <Bar yAxisId="right" dataKey="rainfall" fill="#10b981" name={t('dashboard:analytics.dailyRainfall')} radius={[4, 4, 0, 0]} />
+                        <Line yAxisId="right" type="monotone" dataKey="humidity" stroke="#f97316" strokeWidth={2} dot={false} name={t('dashboard:analytics.dailyHumidity')} />
+                      </ComposedChart>
+                    ) : activeChartTab === 'tmat' ? (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis fontSize={11} label={{ value: 'TMAT (cm)', angle: -90, position: 'insideLeft' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="tmat" stroke="#3b82f6" strokeWidth={2} dot={false} name="TMAT" />
+                      </ComposedChart>
+                    ) : activeChartTab === 'rainfall' ? (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis fontSize={11} label={{ value: 'Curah Hujan (mm)', angle: -90, position: 'insideLeft' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Bar dataKey="rainfall" fill="#10b981" name={t('dashboard:analytics.dailyRainfall')} radius={[4, 4, 0, 0]} />
+                      </ComposedChart>
+                    ) : (
+                      <ComposedChart data={chartSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="time" fontSize={11} />
+                        <YAxis fontSize={11} label={{ value: 'Kelembapan (%)', angle: -90, position: 'insideLeft' }} />
+                        <RechartsTooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="humidity" stroke="#f97316" strokeWidth={2} dot={false} name={t('dashboard:analytics.dailyHumidity')} />
+                      </ComposedChart>
+                    )}
+                  </ResponsiveContainer>
                 </div>
               ) : (
                 <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 text-center">
@@ -389,36 +624,36 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
               </h4>
               <div className="space-y-1 text-xs text-slate-600">
                 <div className="flex justify-between">
-                  <span>{t('dashboard:analytics.deviceId')}:</span>
-                  <span className="font-medium text-slate-800">{getDeviceDisplayLabel(selectedDevice)}</span>
+                  <span>{t('dashboard:analytics.deviceCode')}:</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.kode_titik || selectedDevice.device_id_unik || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>{t('dashboard:analytics.city')}:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.desa || '-'}</span>
+                  <span>{t('dashboard:analytics.technicalId')}:</span>
+                  <span className="font-medium text-slate-800">{selectedDevice.device_id_unik || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{t('dashboard:analytics.companyName')}:</span>
+                  <span className="font-medium text-slate-800 text-right">{selectedCompanyName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('dashboard:analytics.province')}:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.provinsi_id || '-'}</span>
+                  <span className="font-medium text-slate-800 text-right">{selectedDevice.provinsi_nama || selectedDevice.provinsi_id || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Provinsi ID:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.provinsi_id || '-'}</span>
+                  <span>{t('dashboard:analytics.city')}:</span>
+                  <span className="font-medium text-slate-800 text-right">{selectedDevice.kabupaten_nama || selectedDevice.kabupaten_id || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Kabupaten ID:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.kabupaten_id || '-'}</span>
+                  <span>{t('dashboard:analytics.district')}:</span>
+                  <span className="font-medium text-slate-800 text-right">{selectedDevice.kecamatan_nama || selectedDevice.kecamatan_id || '-'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Kecamatan ID:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.kecamatan_id || '-'}</span>
+                  <span>{t('dashboard:analytics.village')}:</span>
+                  <span className="font-medium text-slate-800 text-right">{cleanLocationText(selectedDevice.kelurahan_nama || selectedDevice.desa || selectedDevice.kelurahan_id || '-')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Desa/Kelurahan:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.desa || '-'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Kelurahan ID:</span>
-                  <span className="font-medium text-slate-800">{selectedDevice.kelurahan_id || '-'}</span>
+                  <span>{t('dashboard:analytics.address')}:</span>
+                  <span className="font-medium text-slate-800 text-right">{cleanAddressText(selectedDevice.alamat)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('dashboard:analytics.companyType')}:</span>

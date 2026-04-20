@@ -1,9 +1,14 @@
 {
   "rawData": {
     "title": "Raw Data Telemetry",
+    "sheetName": "Raw Data",
+    "generatedLabel": "Generated",
+    "pageLabel": "Page",
+    "ofLabel": "of",
     "headers": {
       "timestamp": "Timestamp",
-      "deviceId": "Device ID",
+      "deviceId": "Device Code",
+      "companyName": "Company Name",
       "location": "Location",
       "tmat": "TMAT (cm)",
       "temperature": "Temp (°C)",

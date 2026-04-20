@@ -21,7 +21,10 @@
   "buttons": {
     "cancel": "Batal",
     "save": "Simpan Perangkat",
-    "exportCsv": "Ekspor CSV"
+    "export": "Ekspor",
+    "exportCsv": "Ekspor CSV",
+    "exportPdf": "Ekspor PDF",
+    "exportExcel": "Ekspor Excel"
   },
   "language": {
     "english": "English",

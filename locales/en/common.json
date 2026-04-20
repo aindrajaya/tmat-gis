@@ -21,7 +21,10 @@
   "buttons": {
     "cancel": "Cancel",
     "save": "Save Device",
-    "exportCsv": "Export CSV"
+    "export": "Export",
+    "exportCsv": "Export CSV",
+    "exportPdf": "Export PDF",
+    "exportExcel": "Export Excel"
   },
   "language": {
     "english": "English",

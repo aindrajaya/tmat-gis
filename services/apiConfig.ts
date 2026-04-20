@@ -2,6 +2,8 @@
  * API Configuration and utilities
  */
 
+import { ApiMode, getRuntimeConfig } from './runtimeConfig';
+
 export const API_CONFIG = {
   production: {
     name: 'Production Proxy',
@@ -15,8 +17,6 @@ export const API_CONFIG = {
   },
 };
 
-export type ApiMode = 'dev' | 'prod';
-
 /**
  * Get API configuration for selected mode
  */
@@ -28,19 +28,18 @@ export function getApiConfig(mode: ApiMode) {
  * Get API base URL from environment or default
  */
 export function getApiBaseUrl(mode: ApiMode): string {
+  const runtimeConfig = getRuntimeConfig();
   if (mode === 'prod') {
-    return (
-      import.meta.env.VITE_PROD_API_URL || API_CONFIG.production.baseUrl
-    );
+    return runtimeConfig.prodApiUrl || API_CONFIG.production.baseUrl;
   }
-  return import.meta.env.VITE_DEV_API_URL || API_CONFIG.development.baseUrl;
+  return runtimeConfig.devApiUrl || API_CONFIG.development.baseUrl;
 }
 
 /**
  * Get current API mode from environment
  */
 export function getCurrentApiMode(): ApiMode {
-  return (import.meta.env.VITE_API_MODE as ApiMode) || 'dev';
+  return getRuntimeConfig().apiMode;
 }
 
 /**

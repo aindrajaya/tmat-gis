@@ -1,9 +1,14 @@
 {
   "rawData": {
     "title": "Telemetri Data Mentah",
+    "sheetName": "Data Mentah",
+    "generatedLabel": "Dibuat",
+    "pageLabel": "Halaman",
+    "ofLabel": "dari",
     "headers": {
       "timestamp": "Stempel Waktu",
-      "deviceId": "ID Perangkat",
+      "deviceId": "Kode Titik",
+      "companyName": "Nama Perusahaan",
       "location": "Lokasi",
       "tmat": "TMAT (cm)",
       "temperature": "Suhu (°C)",

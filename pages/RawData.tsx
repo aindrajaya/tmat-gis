@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, FileSpreadsheet, ChevronDown, Filter, RefreshCw } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Filter, RefreshCw } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -13,7 +13,6 @@ import AdvancedFilterPanel from '../components/AdvancedFilterPanel';
 // Memoized table row component to prevent unnecessary re-renders
 interface TableRowProps {
   row: any;
-  t: any;
 }
 
 const formatMetric = (value: unknown, digits: number, suffix = ''): string => {
@@ -21,10 +20,11 @@ const formatMetric = (value: unknown, digits: number, suffix = ''): string => {
   return Number.isFinite(num) ? `${num.toFixed(digits)}${suffix}` : '—';
 };
 
-const TableRow = memo(({ row, t }: TableRowProps) => (
+const TableRow = memo(({ row }: TableRowProps) => (
   <tr className="hover:bg-slate-50 transition-colors">
-    <td className="px-6 py-3 font-medium">{row.timestamp_data}</td>
-    <td className="px-6 py-3 text-emerald-700">{row.device_id_unik}</td>
+    <td className="px-6 py-3 font-medium">{row.displayTimestamp || row.timestamp_data}</td>
+    <td className="px-6 py-3 text-emerald-700">{row.resolvedDeviceCode}</td>
+    <td className="px-6 py-3">{row.resolvedCompanyName || '-'}</td>
     <td className="px-6 py-3">{row.location}</td>
     <td className={`px-6 py-3 text-right font-bold ${row.tmat_value < -0.4 ? 'text-red-600' : 'text-slate-700'}`}>
       {formatMetric(row.tmat_value, 2, ' cm')}
@@ -36,7 +36,8 @@ const TableRow = memo(({ row, t }: TableRowProps) => (
 ));
 
 const RawData: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isIndonesian = i18n.language === 'id';
   const { filters, enforcedProvinsi, updateFilter } = useFilters();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -72,6 +73,21 @@ const RawData: React.FC = () => {
   // Filter devices before fetching historical data
   const filteredDevices = useMemo(() => {
     if (!devices) return [];
+
+    const normalizeRegion = (value?: string | null): string => {
+      return (value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    const matchesRegion = (filterValue: string, ...candidates: Array<string | null | undefined>): boolean => {
+      if (!filterValue) return true;
+      const target = normalizeRegion(filterValue);
+      return candidates.some((candidate) => normalizeRegion(candidate) === target);
+    };
     
     let filtered = devices;
     
@@ -84,17 +100,17 @@ const RawData: React.FC = () => {
     
     return filtered.filter(device => {
       // Province filter
-      if (targetProv && device.provinsi_id !== targetProv) {
+      if (targetProv && !matchesRegion(targetProv, device.provinsi_nama, device.provinsi_id)) {
         return false;
       }
       
       // Kabupaten filter
-      if (filters.kabupaten && device.kabupaten_id !== filters.kabupaten) {
+      if (filters.kabupaten && !matchesRegion(filters.kabupaten, device.kabupaten_nama, device.kabupaten_id)) {
         return false;
       }
       
       // Kecamatan filter
-      if (filters.kecamatan && device.kecamatan_id !== filters.kecamatan) {
+      if (filters.kecamatan && !matchesRegion(filters.kecamatan, device.kecamatan_nama, device.kecamatan_id)) {
         return false;
       }
       
@@ -176,10 +192,109 @@ const RawData: React.FC = () => {
     return '';
   };
 
+  const normalizeRegionValue = (value?: string | null): string => {
+    return (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const matchesRegionFilter = (
+    filterValue: string,
+    ...candidates: Array<string | null | undefined>
+  ): boolean => {
+    if (!filterValue) return true;
+    const target = normalizeRegionValue(filterValue);
+    return candidates.some((candidate) => normalizeRegionValue(candidate) === target);
+  };
+
+  const parseNumericValue = (value: unknown): number | null => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const formatTimestampLabel = (timestamp: unknown): string => {
+    if (!timestamp) return '-';
+    const raw = String(timestamp).trim();
+    if (!raw) return '-';
+
+    const normalized = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) return raw;
+
+    return parsed.toLocaleString(isIndonesian ? 'id-ID' : 'en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  const parseTimestampToDate = (timestamp: unknown): Date | null => {
+    if (!timestamp) return null;
+    const raw = String(timestamp).trim();
+    if (!raw) return null;
+
+    const normalized = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+    const parsed = new Date(normalized);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const getExportTimestampText = (row: any): string => {
+    return row.displayTimestamp || formatTimestampLabel(row.timestamp_data);
+  };
+
+  const formatTimestampForExcel = (timestamp: unknown): string => {
+    const parsed = parseTimestampToDate(timestamp);
+    if (!parsed) return formatTimestampLabel(timestamp);
+
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
+  };
+
+  const exportHeaders = useMemo(
+    () => [
+      t('tables:rawData.headers.timestamp'),
+      t('tables:rawData.headers.deviceId'),
+      t('tables:rawData.headers.companyName', 'Company Name'),
+      t('tables:rawData.headers.location'),
+      t('tables:rawData.headers.tmat'),
+      t('tables:rawData.headers.temperature'),
+      t('tables:rawData.headers.rainfall', 'Curah Hujan (mm)'),
+      t('tables:rawData.headers.humidity', 'Kelembapan (%)')
+    ],
+    [t]
+  );
+
   const companyTypeById = useMemo(() => {
     const map = new Map<number, string>();
     (companies || []).forEach((company) => {
-      map.set(company.id, company.jenis_perusahaan);
+      const companyId = Number((company as any).id);
+      if (Number.isFinite(companyId)) {
+        map.set(companyId, (company as any).jenis_perusahaan);
+      }
+    });
+    return map;
+  }, [companies]);
+
+  const companyNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    (companies || []).forEach((company) => {
+      const companyId = Number((company as any).id);
+      if (Number.isFinite(companyId)) {
+        const companyName = String(
+          (company as any).nama_perusahaan ||
+          (company as any).perusahaan_nama ||
+          (company as any).company_name ||
+          (company as any).name ||
+          ''
+        );
+        map.set(companyId, companyName);
+      }
     });
     return map;
   }, [companies]);
@@ -197,24 +312,59 @@ const RawData: React.FC = () => {
     const deviceById = new Map(
       (devices || []).map(d => [normalizeDeviceKey(d.device_id_unik), d])
     );
+    const deviceByCode = new Map(
+      (devices || [])
+        .filter(d => d.kode_titik)
+        .map(d => [normalizeDeviceKey(d.kode_titik), d])
+    );
+
+    const resolveDevice = (rt: any, rtRaw: Record<string, unknown>) => {
+      const candidates = [
+        rt?.device_id_unik,
+        rtRaw?.device_id_unik,
+        rt?.device_id,
+        rtRaw?.device_id,
+        rt?.deviceId,
+        rtRaw?.deviceId,
+      ].filter(Boolean);
+
+      for (const candidate of candidates) {
+        const device = deviceById.get(normalizeDeviceKey(candidate));
+        if (device) return device;
+      }
+
+      const codeCandidates = [
+        rt?.kode_titik,
+        rtRaw?.kode_titik,
+        rtRaw?.kodeTitik,
+        rtRaw?.device_code,
+      ].filter(Boolean);
+
+      for (const candidate of codeCandidates) {
+        const device = deviceByCode.get(normalizeDeviceKey(candidate));
+        if (device) return device;
+      }
+
+      return undefined;
+    };
 
     // Province gate: drop records outside enforced or selected province
     const targetProv = enforcedProvinsi || filters.provinsi;
     
     return sourceData
       // Province filter (only for realtime mode - historical already filtered via devices)
-      .filter(rt => {
+      .filter((rt: any) => {
         if (isHistoricalMode) return true; // Already filtered by device selection
         if (!targetProv) return true;
-        const device = deviceById.get(normalizeDeviceKey(rt.device_id_unik));
         const rtRaw = rt as unknown as Record<string, unknown>;
-        const realtimeProvinsi = pickText(rtRaw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
+        const device = resolveDevice(rt, rtRaw);
+        const realtimeProvinsi = pickText(rtRaw, ['provinsi_nama', 'nama_provinsi', 'province', 'provinsi', 'provinsi_id']);
         return device
-          ? String(device.provinsi_id || '') === String(targetProv)
-          : realtimeProvinsi === targetProv;
+          ? matchesRegionFilter(targetProv, device.provinsi_nama, device.provinsi_id)
+          : matchesRegionFilter(targetProv, realtimeProvinsi);
       })
       // Date range filter (only for realtime mode - historical fetch already handles this)
-      .filter(rt => {
+      .filter((rt: any) => {
         if (isHistoricalMode) return true; // Historical data already filtered by date range
         if (!filters.startDate && !filters.endDate) return true;
         const dataDate = extractDatePart(rt.timestamp_data);
@@ -231,34 +381,59 @@ const RawData: React.FC = () => {
         return matchesStart && matchesEnd;
       })
       // Enrich with device data
-      .map(rt => {
-        const device = deviceById.get(normalizeDeviceKey(rt.device_id_unik));
+      .map((rt: any) => {
         const rtRaw = rt as unknown as Record<string, unknown>;
-        const realtimeProvinsi = pickText(rtRaw, ['provinsi', 'province', 'nama_provinsi', 'provinsi_id']);
-        const realtimeKabupaten = pickText(rtRaw, ['kabupaten', 'regency', 'nama_kabupaten', 'kabupaten_id']);
-        const realtimeKecamatan = pickText(rtRaw, ['kecamatan', 'district', 'nama_kecamatan', 'kecamatan_id', 'kota', 'city']);
+        const device = resolveDevice(rt, rtRaw);
+        const realtimeProvinsiNama = pickText(rtRaw, ['provinsi_nama', 'nama_provinsi', 'province', 'provinsi']);
+        const realtimeProvinsiId = pickText(rtRaw, ['provinsi_id']);
+        const realtimeKabupatenNama = pickText(rtRaw, ['kabupaten_nama', 'nama_kabupaten', 'regency', 'kabupaten']);
+        const realtimeKabupatenId = pickText(rtRaw, ['kabupaten_id']);
+        const realtimeKecamatanNama = pickText(rtRaw, ['kecamatan_nama', 'nama_kecamatan', 'district', 'kecamatan', 'kota', 'city']);
+        const realtimeKecamatanId = pickText(rtRaw, ['kecamatan_id']);
         const realtimeDesa = pickText(rtRaw, ['desa', 'kelurahan', 'village', 'village_name', 'kelurahan_id']);
-        const resolvedProvinsi = String(device?.provinsi_id || realtimeProvinsi || '-');
-        const resolvedKabupaten = String(device?.kabupaten_id || realtimeKabupaten || '-');
-        const resolvedKecamatan = String(device?.kecamatan_id || realtimeKecamatan || '-');
+        const realtimeCompanyName = pickText(rtRaw, ['perusahaan_nama', 'nama_perusahaan', 'company_name', 'company', 'name', 'nama']);
+        const realtimeCompanyId = Number(
+          pickText(rtRaw, ['id_perusahaan', 'perusahaan_id', 'company_id']) ||
+          (rt as any)?.id_perusahaan ||
+          (rt as any)?.company_id ||
+          NaN
+        );
+        const resolvedProvinsiName = String(device?.provinsi_nama || realtimeProvinsiNama || device?.provinsi_id || realtimeProvinsiId || '-');
+        const resolvedKabupatenName = String(device?.kabupaten_nama || realtimeKabupatenNama || device?.kabupaten_id || realtimeKabupatenId || '-');
+        const resolvedKecamatanName = String(device?.kecamatan_nama || realtimeKecamatanNama || device?.kecamatan_id || realtimeKecamatanId || '-');
+        const resolvedProvinsiId = String(device?.provinsi_id || realtimeProvinsiId || '');
+        const resolvedKabupatenId = String(device?.kabupaten_id || realtimeKabupatenId || '');
+        const resolvedKecamatanId = String(device?.kecamatan_id || realtimeKecamatanId || '');
         const resolvedDesa = device?.desa || realtimeDesa || '';
         const resolvedAlamat = device?.alamat || pickText(rtRaw, ['alamat', 'address']) || '';
-        const resolvedLocation = [resolvedDesa || resolvedKecamatan, resolvedKabupaten, resolvedProvinsi]
+        const resolvedLocation = [resolvedDesa || resolvedKecamatanName, resolvedKabupatenName, resolvedProvinsiName]
           .filter(Boolean)
           .join(', ');
+        const resolvedDeviceCode = String(device?.kode_titik || pickText(rtRaw, ['kode_titik', 'kodeTitik', 'device_code']) || rt.device_id_unik || '-');
+        const resolvedCompanyName =
+          (device?.id_perusahaan ? companyNameById.get(Number(device.id_perusahaan)) : undefined) ||
+          (Number.isFinite(realtimeCompanyId) ? companyNameById.get(realtimeCompanyId) : undefined) ||
+          realtimeCompanyName ||
+          (user?.role === 'perusahaan' ? user?.perusahaanName || '' : '');
 
         return {
           ...rt,
           device: device,
-          resolvedProvinsi,
-          resolvedKabupaten,
-          resolvedKecamatan,
+          displayTimestamp: formatTimestampLabel(rt.timestamp_data),
+          resolvedDeviceCode,
+          resolvedProvinsiName,
+          resolvedKabupatenName,
+          resolvedKecamatanName,
+          resolvedProvinsiId,
+          resolvedKabupatenId,
+          resolvedKecamatanId,
           resolvedDesa,
           resolvedAlamat,
+          resolvedCompanyName,
           location: resolvedLocation,
         };
       });
-  }, [isHistoricalMode, historicalData.data, realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi]);
+  }, [isHistoricalMode, historicalData.data, realtimeData, devices, filters.startDate, filters.endDate, enforcedProvinsi, filters.provinsi, companyNameById, user, isIndonesian]);
 
   // Reset to first page when base table data changes
   useEffect(() => {
@@ -270,7 +445,7 @@ const RawData: React.FC = () => {
     // Early exit if no base data
     if (!tableData || tableData.length === 0) return [];
 
-    return tableData.filter(row => {
+    return tableData.filter((row: any) => {
       // Company user filter: only show data from user's company devices (defense-in-depth)
       if (user?.role === 'perusahaan' && user?.perusahaanId) {
         if (row.device?.id_perusahaan !== user.perusahaanId) {
@@ -279,12 +454,18 @@ const RawData: React.FC = () => {
       }
 
       // Filter by kabupaten (city)
-      if (filters.kabupaten && row.resolvedKabupaten !== filters.kabupaten) {
+      if (
+        filters.kabupaten &&
+        !matchesRegionFilter(filters.kabupaten, row.resolvedKabupatenName, row.resolvedKabupatenId)
+      ) {
         return false;
       }
 
       // Filter by kecamatan
-      if (filters.kecamatan && row.resolvedKecamatan !== filters.kecamatan) {
+      if (
+        filters.kecamatan &&
+        !matchesRegionFilter(filters.kecamatan, row.resolvedKecamatanName, row.resolvedKecamatanId)
+      ) {
         return false;
       }
 
@@ -316,13 +497,15 @@ const RawData: React.FC = () => {
       // Apply search filter
       if (filters.searchText) {
         const searchLower = filters.searchText.toLowerCase();
-        const matchesId = row.device_id_unik.toLowerCase().includes(searchLower);
+        const matchesId = row.resolvedDeviceCode.toLowerCase().includes(searchLower);
+        const matchesDeviceUniqueId = row.device_id_unik.toLowerCase().includes(searchLower);
+        const matchesCompany = row.resolvedCompanyName?.toLowerCase().includes(searchLower);
         const matchesLocation = row.location.toLowerCase().includes(searchLower);
-        const matchesKota = row.resolvedKecamatan?.toLowerCase().includes(searchLower);
-        const matchesProvinsi = row.resolvedProvinsi?.toLowerCase().includes(searchLower);
+        const matchesKota = row.resolvedKecamatanName?.toLowerCase().includes(searchLower);
+        const matchesProvinsi = row.resolvedProvinsiName?.toLowerCase().includes(searchLower);
         const matchesAlamat = row.resolvedAlamat?.toLowerCase().includes(searchLower);
         
-        if (!(matchesId || matchesLocation || matchesKota || matchesProvinsi || matchesAlamat)) {
+        if (!(matchesId || matchesDeviceUniqueId || matchesCompany || matchesLocation || matchesKota || matchesProvinsi || matchesAlamat)) {
           return false;
         }
       }
@@ -389,12 +572,12 @@ const RawData: React.FC = () => {
   const exportToCSV = useCallback(() => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Timestamp', 'Device ID', 'Location', 'TMAT (cm)', 'Temperature (°C)', 'Curah Hujan (mm)', 'Kelembapan (%)'];
     const csvContent = [
-      headers.join(','),
-      ...filteredData.map(row => [
-        row.timestamp_data,
-        row.device_id_unik,
+      exportHeaders.join(','),
+      ...filteredData.map((row: any) => [
+        getExportTimestampText(row),
+        row.resolvedDeviceCode,
+        row.resolvedCompanyName || '-',
         row.location,
         formatMetric(row.tmat_value, 2, ' cm'),
         formatMetric(row.suhu_value, 1, '°C'),
@@ -414,7 +597,7 @@ const RawData: React.FC = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
-  }, [filteredData]);
+  }, [filteredData, exportHeaders, isIndonesian]);
 
   // Export to PDF
   const exportToPDF = useCallback(() => {
@@ -428,12 +611,16 @@ const RawData: React.FC = () => {
     // Add title
     doc.setFontSize(16);
     doc.setTextColor(30, 41, 59);
-    doc.text('Raw Data Export', margin, 15);
+    doc.text(t('tables:rawData.title'), margin, 15);
 
     // Add date
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, 22);
+    doc.text(
+      `${t('tables:rawData.generatedLabel', isIndonesian ? 'Dibuat' : 'Generated')}: ${new Date().toLocaleString(isIndonesian ? 'id-ID' : 'en-US')}`,
+      margin,
+      22
+    );
 
     // Add filter info if applied
     let filterY = 28;
@@ -455,10 +642,11 @@ const RawData: React.FC = () => {
     }
 
     // Prepare table data
-    const headers = [['Timestamp', 'Device ID', 'Location', 'TMAT (cm)', 'Temperature (°C)', 'Curah Hujan (mm)', 'Kelembapan (%)']];
-    const rows = filteredData.map(row => [
-      row.timestamp_data,
-      row.device_id_unik,
+    const headers = [exportHeaders];
+    const rows = filteredData.map((row: any) => [
+      getExportTimestampText(row),
+      row.resolvedDeviceCode,
+      row.resolvedCompanyName || '-',
       row.location,
       formatMetric(row.tmat_value, 2, ' cm'),
       formatMetric(row.suhu_value, 1, '°C'),
@@ -484,7 +672,8 @@ const RawData: React.FC = () => {
       columnStyles: {
         0: { halign: 'left', cellWidth: 45 },
         1: { halign: 'left', cellWidth: 35 },
-        2: { halign: 'left', cellWidth: 40 }
+        2: { halign: 'left', cellWidth: 45 },
+        3: { halign: 'left', cellWidth: 40 }
       }
     });
 
@@ -495,7 +684,7 @@ const RawData: React.FC = () => {
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
       doc.text(
-        `Page ${i} of ${pageCount} | Raw Data Export`,
+        `${t('tables:rawData.pageLabel', isIndonesian ? 'Halaman' : 'Page')} ${i} ${t('tables:rawData.ofLabel', isIndonesian ? 'dari' : 'of')} ${pageCount} | ${t('tables:rawData.title')}`,
         pageWidth / 2,
         pageHeight - 10,
         { align: 'center' }
@@ -504,29 +693,44 @@ const RawData: React.FC = () => {
 
     doc.save(`raw-data-${new Date().toISOString().split('T')[0]}.pdf`);
     setShowExportMenu(false);
-  }, [filteredData, filters]);
+  }, [filteredData, filters, exportHeaders, isIndonesian, t]);
 
   // Export to Excel
   const exportToExcel = useCallback(() => {
     if (filteredData.length === 0) return;
 
-    const excelData = filteredData.map(row => ({
-      'Timestamp': row.timestamp_data,
-      'Device ID': row.device_id_unik,
-      'Location': row.location,
-      'TMAT (cm)': formatMetric(row.tmat_value, 2, ' cm'),
-      'Temperature (°C)': formatMetric(row.suhu_value, 1, '°C'),
-      'Curah Hujan (mm)': formatMetric(row.curah_hujan, 1, ' mm'),
-      'Kelembapan (%)': formatMetric(row.kelembapan, 1, '%')
-    }));
+    const excelRows = filteredData.map((row: any) => [
+      formatTimestampForExcel(row.timestamp_data),
+      row.resolvedDeviceCode,
+      row.resolvedCompanyName || '-',
+      row.location,
+      parseNumericValue(row.tmat_value),
+      parseNumericValue(row.suhu_value),
+      parseNumericValue(row.curah_hujan),
+      parseNumericValue(row.kelembapan),
+    ]);
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    // Build a real XLSX worksheet (not delimiter-based text) to avoid CSV-like rendering.
+    const worksheet = XLSX.utils.aoa_to_sheet([exportHeaders, ...excelRows]);
     const workbook = XLSX.utils.book_new();
+
+    // Enforce number formatting for metric columns.
+    for (let rowIndex = 2; rowIndex <= excelRows.length + 1; rowIndex += 1) {
+      const tmatCell = worksheet[`E${rowIndex}`];
+      const tempCell = worksheet[`F${rowIndex}`];
+      const rainCell = worksheet[`G${rowIndex}`];
+      const humCell = worksheet[`H${rowIndex}`];
+      if (tmatCell && typeof tmatCell.v === 'number') tmatCell.z = '0.00';
+      if (tempCell && typeof tempCell.v === 'number') tempCell.z = '0.0';
+      if (rainCell && typeof rainCell.v === 'number') rainCell.z = '0.0';
+      if (humCell && typeof humCell.v === 'number') humCell.z = '0.0';
+    }
 
     // Set column widths
     worksheet['!cols'] = [
       { wch: 20 }, // Timestamp
-      { wch: 18 }, // Device ID
+      { wch: 18 }, // Kode Titik
+      { wch: 28 }, // Nama Perusahaan
       { wch: 25 }, // Location
       { wch: 15 }, // TMAT
       { wch: 18 }, // Temperature
@@ -534,10 +738,13 @@ const RawData: React.FC = () => {
       { wch: 15 }, // Humidity
     ];
 
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Raw Data');
-    XLSX.writeFile(workbook, `raw-data-${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, t('tables:rawData.sheetName', 'Raw Data'));
+    XLSX.writeFile(workbook, `raw-data-${new Date().toISOString().split('T')[0]}.xlsx`, {
+      bookType: 'xlsx',
+      compression: true,
+    });
     setShowExportMenu(false);
-  }, [filteredData]);
+  }, [filteredData, exportHeaders, t, isIndonesian]);
 
   const loading = isHistoricalMode ? historicalData.isLoading : realtimeLoading;
   const error = isHistoricalMode ? historicalData.error : realtimeError;
@@ -672,18 +879,18 @@ const RawData: React.FC = () => {
                 className="text-sm font-medium flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition"
               >
                 <Download size={16} />
-                {t('common:buttons.exportCsv')}
+                {t('common:buttons.export', 'Export')}
               </button>
 
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
                 <button
-                  onClick={exportToCSV}
+                  onClick={exportToExcel}
                   disabled={filteredData.length === 0}
                   className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <FileText size={16} className="text-blue-500" />
-                  Export CSV
+                  <FileSpreadsheet size={16} className="text-green-600" />
+                  {t('common:buttons.exportExcel', 'Export Excel')}
                 </button>
                 <button
                   onClick={exportToPDF}
@@ -691,15 +898,15 @@ const RawData: React.FC = () => {
                   className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <FileText size={16} className="text-red-500" />
-                  Export PDF
+                  {t('common:buttons.exportPdf', 'Export PDF')}
                 </button>
                 <button
-                  onClick={exportToExcel}
+                  onClick={exportToCSV}
                   disabled={filteredData.length === 0}
                   className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <FileSpreadsheet size={16} className="text-green-600" />
-                  Export Excel
+                  <FileText size={16} className="text-blue-500" />
+                  {t('common:buttons.exportCsv')}
                 </button>
               </div>
             )}
@@ -737,6 +944,7 @@ const RawData: React.FC = () => {
               <tr>
                 <th className="px-6 py-3">{t('tables:rawData.headers.timestamp')}</th>
                 <th className="px-6 py-3">{t('tables:rawData.headers.deviceId')}</th>
+                <th className="px-6 py-3">{t('tables:rawData.headers.companyName', 'Company Name')}</th>
                 <th className="px-6 py-3">{t('tables:rawData.headers.location')}</th>
                 <th className="px-6 py-3 text-right">{t('tables:rawData.headers.tmat')}</th>
                 <th className="px-6 py-3 text-right">{t('tables:rawData.headers.temperature')}</th>
@@ -747,11 +955,11 @@ const RawData: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {paginatedData.length > 0 ? (
                 paginatedData.map((row) => (
-                  <TableRow key={row.id} row={row} t={t} />
+                  <TableRow key={row.id} row={row} />
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-slate-500">
                     No data available
                   </td>
                 </tr>

@@ -7,6 +7,7 @@ import {
   PublicMapSummary,
   RealtimeData
 } from '../types';
+import { getApiBaseUrl, getCurrentApiMode } from './apiConfig';
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -16,10 +17,7 @@ export interface PaginatedResponse<T> {
 }
 
 export function getApiHost() {
-  const apiMode = (import.meta.env.VITE_API_MODE || 'dev') as 'dev' | 'prod';
-  return apiMode === 'prod'
-    ? import.meta.env.VITE_PROD_API_URL || 'https://proxy.yourdomain.com'
-    : import.meta.env.VITE_DEV_API_URL || 'http://localhost:4000';
+  return getApiBaseUrl(getCurrentApiMode());
 }
 
 export function getAuthBaseUrl() {
@@ -41,7 +39,23 @@ function normalizeDevice(raw: any): Device {
     kabupaten_nama: raw.kabupaten_nama ?? raw.regency_name ?? null,
     kecamatan_nama: raw.kecamatan_nama ?? raw.district_name ?? null,
     kelurahan_nama: raw.kelurahan_nama ?? raw.village_name ?? null,
-    desa: raw.desa ?? raw.alamat ?? null,
+    desa: raw.desa ?? raw.kelurahan_nama ?? raw.village_name ?? null,
+  };
+}
+
+function normalizePerusahaan(raw: any): Perusahaan {
+  return {
+    ...raw,
+    id: Number(raw.id),
+    nama_perusahaan: String(raw.nama_perusahaan ?? raw.company_name ?? ''),
+    kode_perusahaan: String(raw.kode_perusahaan ?? raw.company_code ?? ''),
+    jenis_perusahaan: (raw.jenis_perusahaan ?? raw.company_type ?? '') as Perusahaan['jenis_perusahaan'],
+    pic_kontak: String(raw.pic_kontak ?? raw.contact_person ?? ''),
+    email_kontak: String(raw.email_kontak ?? raw.contact_email ?? ''),
+    telepon: String(raw.telepon ?? raw.phone ?? ''),
+    alamat: String(raw.alamat ?? raw.address ?? ''),
+    status: String(raw.status ?? ''),
+    created_at: String(raw.created_at ?? ''),
   };
 }
 
@@ -147,12 +161,19 @@ export class APIClient {
       const response = await this.request<any>(`/proxy/perusahaan/${id}`);
       const rawSingle = response?.data ?? response?.master_perusahaan ?? response;
       const data = Array.isArray(rawSingle) ? rawSingle : [rawSingle];
-      return data;
+      return data
+        .filter(Boolean)
+        .map(normalizePerusahaan)
+        .filter((company) => Number.isFinite(company.id));
     }
     const response = await this.request<any>('/proxy/perusahaan');
-    return Array.isArray(response)
+    const rawCompanies = Array.isArray(response)
       ? response
       : response?.data || response?.master_perusahaan || [];
+    return rawCompanies
+      .filter(Boolean)
+      .map(normalizePerusahaan)
+      .filter((company) => Number.isFinite(company.id));
   }
 
   async getPerusahaanById(id: number): Promise<Perusahaan> {

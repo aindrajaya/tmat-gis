@@ -24,12 +24,40 @@ const hasValidMetric = (value: number | undefined): value is number => Number.is
 const formatMetric = (value: number | undefined, digits: number, suffix = ''): string =>
   hasValidMetric(value) ? `${value.toFixed(digits)}${suffix}` : '—';
 
+const cleanLocationText = (value?: string | null): string => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return trimmed.split(',')[0]?.trim() || trimmed;
+};
+
+const joinLocationParts = (...values: Array<string | null | undefined>): string => {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+
+  values.forEach((value) => {
+    const normalized = cleanLocationText(value || '');
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    parts.push(normalized);
+  });
+
+  return parts.join(', ') || 'Unknown';
+};
+
 const getDeviceLocationLabel = (device: Device): string => {
-  return [device.desa, device.kabupaten_id, device.provinsi_id].filter(Boolean).join(', ') || 'Unknown';
+  return joinLocationParts(
+    device.kelurahan_nama || device.desa || device.kelurahan_id,
+    device.kecamatan_nama || device.kecamatan_id,
+    device.kabupaten_nama || device.kabupaten_id,
+    device.provinsi_nama || device.provinsi_id,
+  );
 };
 
 const getDeviceDisplayLabel = (device: Device): string => {
-  return `Device ${device.kode_titik || device.device_id_unik}`;
+  return `Nomor Titik ${device.kode_titik || device.device_id_unik}`;
 };
 
 /**

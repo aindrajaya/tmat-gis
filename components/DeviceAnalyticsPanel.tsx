@@ -33,6 +33,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
   const { data: perusahaanList } = usePerusahaan(user?.perusahaanId || undefined);
   const { data: realtimeSnapshotData } = useRealtimeAll(user?.perusahaanId || undefined);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDailySummaryOpen, setIsDailySummaryOpen] = useState(false);
   const [historicalData, setHistoricalData] = useState<RealtimeData[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<Error | null>(null);
@@ -458,12 +459,25 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
 
             {/* Daily Rainfall and Humidity Summary */}
             <div className="bg-white rounded-lg border border-slate-200 p-4">
-              <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <CloudRain size={14} className="text-blue-600" />
-                {t('dashboard:analytics.dailySummary')}
-              </h4>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h4 className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                  <CloudRain size={14} className="text-blue-600" />
+                  {t('dashboard:analytics.dailySummary')}
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setIsDailySummaryOpen((prev) => !prev)}
+                  className="text-slate-500 hover:text-slate-700 transition-colors"
+                  aria-label={isDailySummaryOpen ? 'Close Ringkasan Harian' : 'Open Ringkasan Harian'}
+                >
+                  <ChevronUp
+                    size={16}
+                    className={`transition-transform ${isDailySummaryOpen ? '' : 'rotate-180'}`}
+                  />
+                </button>
+              </div>
 
-              {dailySummaryData.length > 0 ? (
+              {isDailySummaryOpen && (dailySummaryData.length > 0 ? (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
@@ -513,7 +527,7 @@ const DeviceAnalyticsPanel: React.FC<Props> = ({ selectedDevice, realtimeData, o
                 </div>
               ) : (
                 <p className="text-xs text-slate-500">{t('dashboard:analytics.noHistoricalData')}</p>
-              )}
+              ))}
             </div>
 
             {/* Tabbed Chart Section */}

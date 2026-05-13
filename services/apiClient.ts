@@ -115,7 +115,7 @@ function normalizePublicMapDevice(raw: any): PublicMapDevice {
     kode_titik: raw.kode_titik ?? null,
     latitude: Number(raw.latitude),
     longitude: Number(raw.longitude),
-    status: raw.status || 'nonaktif',
+    status: raw.status || 'aktif', // Public devices default to 'aktif' for chart aggregation
     tipe_alat: raw.tipe_alat ?? null,
     provinsi_id: raw.provinsi_id ?? null,
     provinsi_nama: raw.provinsi_nama ?? null,

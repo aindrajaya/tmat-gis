@@ -89,11 +89,25 @@ export function buildTmatChartSeries(
   selectedCity?: string | null
 ): TmatChartSeries {
   if (!historicalData.length || !devices.length) {
+    console.log('[buildTmatChartSeries] Early exit:', {
+      dataLength: historicalData.length,
+      deviceLength: devices.length,
+    });
     return { daily: [], weekly: [], trend: [] };
   }
 
   const deviceIds = devices.map((device) => device.device_id_unik);
+  console.log('[buildTmatChartSeries] Initial:', {
+    inputDeviceCount: devices.length,
+    inputDataCount: historicalData.length,
+    deviceIds: deviceIds.slice(0, 3),
+  });
+
   let relevantData = historicalData.filter((record) => deviceIds.includes(record.device_id_unik));
+  console.log('[buildTmatChartSeries] After device ID filter:', {
+    matchingRecordCount: relevantData.length,
+    sampleRecord: relevantData[0],
+  });
 
   let applicableDevices = devices;
   if (selectedCity) {
@@ -101,10 +115,22 @@ export function buildTmatChartSeries(
     applicableDevices = cityDevices;
     const cityDeviceIds = cityDevices.map((device) => device.device_id_unik);
     relevantData = relevantData.filter((record) => cityDeviceIds.includes(record.device_id_unik));
+    console.log('[buildTmatChartSeries] After city filter:', {
+      cityDeviceCount: cityDevices.length,
+      matchingRecordCount: relevantData.length,
+    });
   }
 
   const aktifDevices = applicableDevices.filter((device) => device.status === 'aktif');
   const aktifDeviceIds = aktifDevices.map((device) => device.device_id_unik);
+  console.log('[buildTmatChartSeries] Aktif devices:', {
+    totalDevices: applicableDevices.length,
+    aktifCount: aktifDevices.length,
+    statusDistribution: applicableDevices.reduce((acc, d) => {
+      acc[d.status || 'undefined'] = (acc[d.status || 'undefined'] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+  });
 
   if (startDate || endDate) {
     relevantData = relevantData.filter((record) => {
@@ -114,9 +140,24 @@ export function buildTmatChartSeries(
       const matchesEnd = !endDate || dataDate <= endDate;
       return matchesStart && matchesEnd;
     });
+    console.log('[buildTmatChartSeries] After date filter:', {
+      startDate,
+      endDate,
+      matchingRecordCount: relevantData.length,
+    });
   }
 
   relevantData = relevantData.filter((record) => aktifDeviceIds.includes(record.device_id_unik));
+  console.log('[buildTmatChartSeries] After aktif filter:', {
+    matchingRecordCount: relevantData.length,
+    recordsPerDevice: Array.from(
+      relevantData.reduce((acc, r) => {
+        acc.set(r.device_id_unik, (acc.get(r.device_id_unik) || 0) + 1);
+        return acc;
+      }, new Map<string, number>()),
+      ([id, count]) => ({ id, count })
+    ),
+  });
 
   const dailyAggregation: Record<string, TmatChartDailyPoint> = {};
   const latestDailyByDevice = new Map<string, RealtimeData>();
@@ -149,6 +190,11 @@ export function buildTmatChartSeries(
   });
 
   const daily = Object.values(dailyAggregation).sort((a, b) => a.date.localeCompare(b.date));
+  console.log('[buildTmatChartSeries] Daily aggregation:', {
+    dateCount: daily.length,
+    aktifDeviceIds: aktifDeviceIds,
+    sample: daily[0],
+  });
 
   const weeklyAggregation: Record<string, TmatChartWeeklyPoint> = {};
   const latestWeeklyByDevice = new Map<string, RealtimeData>();
@@ -193,6 +239,12 @@ export function buildTmatChartSeries(
       time: extractTimePart(record.timestamp_data) || String(record.timestamp_data || ''),
       tmat: record.tmat_value,
     }));
+
+  console.log('[buildTmatChartSeries] Final result:', {
+    dailyCount: daily.length,
+    weeklyCount: weekly.length,
+    trendCount: trend.length,
+  });
 
   return { daily, weekly, trend };
 }

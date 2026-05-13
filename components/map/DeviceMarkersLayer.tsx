@@ -108,12 +108,11 @@ const DeviceMarkersLayer: React.FC<DeviceMarkersLayerProps> = memo(({
         let mostCriticalSeverityLevel = -1; // Start at -1 so even 'safe' (0) can be selected
 
         const severityOrder = { 
-          safe: 0, 
-          low: 1, 
-          medium: 2, 
-          high: 3, 
-          veryhigh: 4, 
-          extreme: 5 
+          tergenang: 0, 
+          normal: 1, 
+          rawan: 2, 
+          sangat_rawan: 3,
+          offline: 4 
         };
 
         groupDevices.forEach(device => {

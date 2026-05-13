@@ -10,12 +10,10 @@ interface BarChartConditionProps {
 const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ data, chartView }, ref) => {
   const { t } = useTranslation();
   const statusOrder: Record<string, number> = {
-    extreme: 0,
-    veryhigh: 1,
-    high: 2,
-    medium: 3,
-    low: 4,
-    safe: 5,
+    sangat_rawan: 0,
+    rawan: 1,
+    normal: 2,
+    tergenang: 3,
     offline: 6,
   };
   const CustomLegend = ({ payload }: any) => {
@@ -42,27 +40,23 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
   // Convert counts to percentages
   const percentageData = useMemo(() => {
     return data.map(item => {
-      const total = (item.safe || 0) + (item.low || 0) + (item.medium || 0) + (item.high || 0) + (item.veryhigh || 0) + (item.extreme || 0) + (item.offline || 0);
+      const total = (item.tergenang || 0) + (item.normal || 0) + (item.rawan || 0) + (item.sangat_rawan || 0) + (item.offline || 0);
       if (total === 0) {
         return {
           ...item,
-          safe: 0,
-          low: 0,
-          medium: 0,
-          high: 0,
-          veryhigh: 0,
-          extreme: 0,
+          tergenang: 0,
+          normal: 0,
+          rawan: 0,
+          sangat_rawan: 0,
           offline: 0,
         };
       }
       return {
         ...item,
-        safe: Math.round((item.safe || 0) / total * 100),
-        low: Math.round((item.low || 0) / total * 100),
-        medium: Math.round((item.medium || 0) / total * 100),
-        high: Math.round((item.high || 0) / total * 100),
-        veryhigh: Math.round((item.veryhigh || 0) / total * 100),
-        extreme: Math.round((item.extreme || 0) / total * 100),
+        tergenang: Math.round((item.tergenang || 0) / total * 100),
+        normal: Math.round((item.normal || 0) / total * 100),
+        rawan: Math.round((item.rawan || 0) / total * 100),
+        sangat_rawan: Math.round((item.sangat_rawan || 0) / total * 100),
         offline: Math.round((item.offline || 0) / total * 100),
       };
     });
@@ -110,12 +104,10 @@ const BarChartCondition = forwardRef<HTMLDivElement, BarChartConditionProps>(({ 
           <YAxis fontSize={12} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
           <RechartsTooltip content={<CustomTooltip />} />
           <Legend verticalAlign="bottom" align="center" content={<CustomLegend />} />
-          <Bar dataKey="extreme" stackId="a" fill="#EE0000" name="Ekstrim" />
-          <Bar dataKey="veryhigh" stackId="a" fill="#FFC000" name="Sangat Tinggi" />
-          <Bar dataKey="high" stackId="a" fill="#F2D335" name="Tinggi" />
-          <Bar dataKey="medium" stackId="a" fill="#00B0F0" name="Sedang" />
-          <Bar dataKey="low" stackId="a" fill="#00B050" name="Rendah" />
-          <Bar dataKey="safe" stackId="a" fill="#703CA0" name="Tidak Beresiko" />
+          <Bar dataKey="sangat_rawan" stackId="a" fill="#EF4444" name="Sangat Rawan" />
+          <Bar dataKey="rawan" stackId="a" fill="#F97316" name="Rawan" />
+          <Bar dataKey="normal" stackId="a" fill="#22C55E" name="Normal" />
+          <Bar dataKey="tergenang" stackId="a" fill="#3B82F6" name="Tergenang" />
           <Bar dataKey="offline" stackId="a" fill="#9CA3AF" name="Offline" />
         </BarChart>
       </ResponsiveContainer>

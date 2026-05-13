@@ -9,7 +9,7 @@ export interface WaterLevelStatus {
   color: string;
   range: string;
   description: string;
-  severity: 'safe' | 'low' | 'medium' | 'high' | 'veryhigh' | 'extreme' | 'offline';
+  severity: 'tergenang' | 'normal' | 'rawan' | 'sangat_rawan' | 'offline';
 }
 
 /**
@@ -20,53 +20,41 @@ export interface WaterLevelStatus {
  * @returns WaterLevelStatus object with color, level, and severity
  */
 export const getWaterLevelStatus = (tmatValue: number, isIndonesian = true): WaterLevelStatus => {
-  if (tmatValue >= 0) {
+  if (!Number.isFinite(tmatValue)) {
+    return getOfflineStatus(isIndonesian);
+  }
+
+  if (tmatValue > 0) {
     return {
-      level: isIndonesian ? 'Tidak Beresiko' : 'No Risk',
-      color: '#703CA0',
-      range: '≥ 0 cm',
-      description: isIndonesian ? 'Tidak beresiko - Aman' : 'No risk - Safe',
-      severity: 'safe'
+      level: isIndonesian ? 'Tergenang' : 'Flooded',
+      color: '#3B82F6',
+      range: '> 0 cm',
+      description: isIndonesian ? 'Tinggi muka air di atas permukaan' : 'Water level above surface',
+      severity: 'tergenang'
     };
-  } else if (tmatValue >= -0.2) {
+  } else if (tmatValue >= -40) {
     return {
-      level: isIndonesian ? 'Rendah' : 'Low',
-      color: '#00B050',
-      range: '0 - 20 cm',
-      description: isIndonesian ? 'Rendah - Aman' : 'Low water level - Safe',
-      severity: 'low'
+      level: isIndonesian ? 'Normal' : 'Normal',
+      color: '#22C55E',
+      range: '-40 cm < nilai ≤ 0 cm',
+      description: isIndonesian ? 'Kondisi normal' : 'Normal condition',
+      severity: 'normal'
     };
-  } else if (tmatValue >= -0.4) {
+  } else if (tmatValue >= -80) {
     return {
-      level: isIndonesian ? 'Sedang' : 'Medium',
-      color: '#00B0F0',
-      range: '20 - 40 cm',
-      description: isIndonesian ? 'Sedang - Perhatian' : 'Moderate water level - Warning',
-      severity: 'medium'
-    };
-  } else if (tmatValue >= -0.6) {
-    return {
-      level: isIndonesian ? 'Tinggi' : 'High',
-      color: '#F2D335',
-      range: '40 - 60 cm',
-      description: isIndonesian ? 'Tinggi - Bahaya' : 'High water level - Danger',
-      severity: 'high'
-    };
-  } else if (tmatValue >= -0.8) {
-    return {
-      level: isIndonesian ? 'Sangat Tinggi' : 'Very High',
-      color: '#FFC000',
-      range: '60 - 80 cm',
-      description: isIndonesian ? 'Sangat Tinggi - Darurat' : 'Very high water level - Emergency',
-      severity: 'veryhigh'
+      level: isIndonesian ? 'Rawan' : 'At Risk',
+      color: '#F97316',
+      range: '-80 cm < nilai ≤ -40 cm',
+      description: isIndonesian ? 'Perlu perhatian' : 'Needs attention',
+      severity: 'rawan'
     };
   } else {
     return {
-      level: isIndonesian ? 'Ekstrim' : 'Extreme',
-      color: '#EE0000',
-      range: '> 80 cm',
-      description: isIndonesian ? 'Ekstrim - Kritis' : 'Extreme water level - Critical',
-      severity: 'extreme'
+      level: isIndonesian ? 'Sangat Rawan' : 'Very Risky',
+      color: '#EF4444',
+      range: '≤ -80 cm',
+      description: isIndonesian ? 'Kondisi kritis atau tanpa data' : 'Critical or no data',
+      severity: 'sangat_rawan'
     };
   }
 };

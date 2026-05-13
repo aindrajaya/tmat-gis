@@ -4,12 +4,10 @@ import L from 'leaflet';
 import { useTranslation } from 'react-i18next';
 
 interface CityStats {
-  safe: number;
-  low: number;
-  medium: number;
-  high: number;
-  veryhigh: number;
-  extreme: number;
+  tergenang: number;
+  normal: number;
+  rawan: number;
+  sangat_rawan: number;
   offline: number;
 }
 
@@ -131,44 +129,30 @@ const CityMarkerComponent: React.FC<{
             
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#703CA0' }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3B82F6' }}></div>
                 <span className="text-slate-600">
-                  {isIndonesian ? 'Aman' : 'Safe'}: {stats.safe}
+                  {isIndonesian ? 'Tergenang' : 'Flooded'}: {stats.tergenang}
                 </span>
               </div>
               
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#00B050' }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#22C55E' }}></div>
                 <span className="text-slate-600">
-                  {isIndonesian ? 'Rendah' : 'Low'}: {stats.low}
+                  {isIndonesian ? 'Normal' : 'Normal'}: {stats.normal}
                 </span>
               </div>
               
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#00B0F0' }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F97316' }}></div>
                 <span className="text-slate-600">
-                  {isIndonesian ? 'Sedang' : 'Medium'}: {stats.medium}
+                  {isIndonesian ? 'Rawan' : 'At Risk'}: {stats.rawan}
                 </span>
               </div>
               
               <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F2D335' }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#EF4444' }}></div>
                 <span className="text-slate-600">
-                  {isIndonesian ? 'Tinggi' : 'High'}: {stats.high}
-                </span>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FFC000' }}></div>
-                <span className="text-slate-600">
-                  {isIndonesian ? 'Sangat Tinggi' : 'Very High'}: {stats.veryhigh}
-                </span>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#EE0000' }}></div>
-                <span className="text-slate-600">
-                  {isIndonesian ? 'Ekstrim' : 'Extreme'}: {stats.extreme}
+                  {isIndonesian ? 'Sangat Rawan' : 'Very Risky'}: {stats.sangat_rawan}
                 </span>
               </div>
               
@@ -220,12 +204,10 @@ const CityMarkersLayer: React.FC<CityMarkersLayerProps> = memo(({
         // Determine color based on most dominant status (prioritize severity)
         let markerColor = '#06b6d4'; // default cyan
         const statusCounts = [
-          { color: '#EE0000', count: stats.extreme },     // red - extreme
-          { color: '#FFC000', count: stats.veryhigh },    // orange - very high
-          { color: '#F2D335', count: stats.high },        // yellow - high
-          { color: '#00B0F0', count: stats.medium },      // light blue - medium
-          { color: '#00B050', count: stats.low },         // green - low
-          { color: '#703CA0', count: stats.safe },        // purple - no risk
+          { color: '#EF4444', count: stats.sangat_rawan }, // red - very risky
+          { color: '#F97316', count: stats.rawan },        // orange - risky
+          { color: '#22C55E', count: stats.normal },       // green - normal
+          { color: '#3B82F6', count: stats.tergenang },    // blue - flooded
           { color: '#94a3b8', count: stats.offline }      // gray - offline
         ];
         

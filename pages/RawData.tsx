@@ -26,7 +26,7 @@ const TableRow = memo(({ row }: TableRowProps) => (
     <td className="px-6 py-3 text-emerald-700">{row.resolvedDeviceCode}</td>
     <td className="px-6 py-3">{row.resolvedCompanyName || '-'}</td>
     <td className="px-6 py-3">{row.location}</td>
-    <td className={`px-6 py-3 text-right font-bold ${row.tmat_value < -0.4 ? 'text-red-600' : 'text-slate-700'}`}>
+    <td className={`px-6 py-3 text-right font-bold ${Number.isFinite(row.tmat_value) && row.tmat_value <= -80 ? 'text-red-600' : 'text-slate-700'}`}>
       {formatMetric(row.tmat_value, 2, ' cm')}
     </td>
     <td className="px-6 py-3 text-right">{formatMetric(row.suhu_value, 1, '°C')}</td>
@@ -581,8 +581,8 @@ const RawData: React.FC = () => {
         row.location,
         formatMetric(row.tmat_value, 2, ' cm'),
         formatMetric(row.suhu_value, 1, '°C'),
-        formatMetric(row.curah_hujan, 1, ' mm'),
-        formatMetric(row.kelembapan, 1, '%')
+        formatMetric(row.curah_hujan ?? 0, 1, ' mm'),
+        formatMetric(row.kelembapan ?? 0, 1, '%')
       ].map(cell => `"${cell}"`).join(','))
     ].join('\n');
 
@@ -650,8 +650,8 @@ const RawData: React.FC = () => {
       row.location,
       formatMetric(row.tmat_value, 2, ' cm'),
       formatMetric(row.suhu_value, 1, '°C'),
-      formatMetric(row.curah_hujan, 1, ' mm'),
-      formatMetric(row.kelembapan, 1, '%')
+      formatMetric(row.curah_hujan ?? 0, 1, ' mm'),
+      formatMetric(row.kelembapan ?? 0, 1, '%')
     ]);
 
     // Add table
@@ -706,8 +706,8 @@ const RawData: React.FC = () => {
       row.location,
       parseNumericValue(row.tmat_value),
       parseNumericValue(row.suhu_value),
-      parseNumericValue(row.curah_hujan),
-      parseNumericValue(row.kelembapan),
+      parseNumericValue(row.curah_hujan) ?? 0,
+      parseNumericValue(row.kelembapan) ?? 0,
     ]);
 
     // Build a real XLSX worksheet (not delimiter-based text) to avoid CSV-like rendering.

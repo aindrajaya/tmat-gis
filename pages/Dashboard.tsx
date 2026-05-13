@@ -254,7 +254,7 @@ const Dashboard: React.FC = () => {
     user?.perusahaanId,
   ]);
 
-  // Get unique devices in critical state (TMAT < -0.4)
+  // Get unique devices in critical state (TMAT <= -80 cm)
   const criticalDevices = useMemo(() => {
     if (!realtimeData || !filteredDevices.length) return new Set();
     
@@ -262,7 +262,7 @@ const Dashboard: React.FC = () => {
     const criticalSet = new Set<string>();
     
     realtimeData.forEach(record => {
-      if (deviceIds.includes(record.device_id_unik) && record.tmat_value < -0.4) {
+      if (deviceIds.includes(record.device_id_unik) && Number.isFinite(record.tmat_value) && record.tmat_value <= -80) {
         criticalSet.add(record.device_id_unik);
       }
     });
@@ -309,16 +309,15 @@ const Dashboard: React.FC = () => {
       relevantData = relevantData.filter((r) => aktifDeviceIds.includes(r.device_id_unik));
 
       const classifyTmatValue = (value: number) => {
-        if (value < -0.6) return 'extreme' as const;
-        if (value < -0.5) return 'veryhigh' as const;
-        if (value < -0.4) return 'high' as const;
-        if (value < -0.2) return 'medium' as const;
-        if (value < 0) return 'low' as const;
-        return 'safe' as const;
+        if (!Number.isFinite(value)) return 'offline' as const;
+        if (value > 0) return 'tergenang' as const;
+        if (value >= -40) return 'normal' as const;
+        if (value >= -80) return 'rawan' as const;
+        return 'sangat_rawan' as const;
       };
 
       // DAILY AGGREGATION
-      const dailyAggregation: { [date: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
+      const dailyAggregation: { [date: string]: { tergenang: number; normal: number; rawan: number; sangat_rawan: number; offline: number } } = {};
 
       const latestDailyByDevice = new Map<string, RealtimeData>();
       relevantData.forEach((r) => {
@@ -335,7 +334,7 @@ const Dashboard: React.FC = () => {
         const date = extractDatePart(r.timestamp_data);
         if (!date) return;
         if (!dailyAggregation[date]) {
-          dailyAggregation[date] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
+          dailyAggregation[date] = { tergenang: 0, normal: 0, rawan: 0, sangat_rawan: 0, offline: 0 };
         }
         dailyAggregation[date][classifyTmatValue(r.tmat_value)]++;
       });
@@ -359,7 +358,7 @@ const Dashboard: React.FC = () => {
       setChartData(dailyChartArray.length > 0 ? dailyChartArray : []);
 
       // WEEKLY AGGREGATION
-      const weeklyAggregation: { [weekStart: string]: { safe: number; low: number; medium: number; high: number; veryhigh: number; extreme: number; offline: number } } = {};
+      const weeklyAggregation: { [weekStart: string]: { tergenang: number; normal: number; rawan: number; sangat_rawan: number; offline: number } } = {};
 
       const latestWeeklyByDevice = new Map<string, RealtimeData>();
       relevantData.forEach((r) => {
@@ -378,7 +377,7 @@ const Dashboard: React.FC = () => {
         if (!date) return;
         const weekStart = getWeekStart(date);
         if (!weeklyAggregation[weekStart]) {
-          weeklyAggregation[weekStart] = { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0, offline: 0 };
+          weeklyAggregation[weekStart] = { tergenang: 0, normal: 0, rawan: 0, sangat_rawan: 0, offline: 0 };
         }
         weeklyAggregation[weekStart][classifyTmatValue(r.tmat_value)]++;
       });

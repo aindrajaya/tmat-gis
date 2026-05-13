@@ -100,12 +100,10 @@ export interface PublicMapDevice {
 }
 
 export interface PublicMapAnalyticsBucket {
-  safe: number;
-  low: number;
-  medium: number;
-  high: number;
-  veryhigh: number;
-  extreme: number;
+  tergenang: number;
+  normal: number;
+  rawan: number;
+  sangat_rawan: number;
   offline: number;
 }
 

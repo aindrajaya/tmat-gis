@@ -59,7 +59,7 @@ const MapView: React.FC = () => {
     const criticalDevices = new Set<string>();
     
     realtimeData.forEach(r => {
-      if (deviceIds.includes(r.device_id_unik) && r.tmat_value < -0.4) {
+      if (deviceIds.includes(r.device_id_unik) && Number.isFinite(r.tmat_value) && r.tmat_value <= -80) {
         criticalDevices.add(r.device_id_unik);
       }
     });

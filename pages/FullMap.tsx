@@ -152,14 +152,47 @@ const FullMap: React.FC = () => {
     filteredDevices.length > 0 && !!filters.startDate && !!filters.endDate
   );
 
+  // DEBUG: Log data flow
+  useEffect(() => {
+    console.log('[FullMap] Public Devices:', {
+      count: publicDevices?.length || 0,
+      aktifCount: publicDevices?.filter(d => d.status === 'aktif').length || 0,
+      sample: publicDevices?.[0],
+    });
+  }, [publicDevices]);
+
+  useEffect(() => {
+    console.log('[FullMap] Filtered Devices:', {
+      count: filteredDevices.length,
+      sample: filteredDevices[0],
+    });
+  }, [filteredDevices]);
+
+  useEffect(() => {
+    console.log('[FullMap] Historical Data:', {
+      recordCount: historicalData.data?.length || 0,
+      isLoading: historicalData.isLoading,
+      error: historicalData.error?.message,
+      sample: historicalData.data?.[0],
+      dateRange: `${filters.startDate} to ${filters.endDate}`,
+    });
+  }, [historicalData.data, historicalData.isLoading, historicalData.error, filters.startDate, filters.endDate]);
+
   const chartData = useMemo(() => {
-    return buildTmatChartSeries(
+    const result = buildTmatChartSeries(
       historicalData.data,
       filteredDevices,
       filters.startDate,
       filters.endDate,
       filters.selectedCity
     );
+    console.log('[FullMap] Chart Data Result:', {
+      daily: result.daily.length,
+      weekly: result.weekly.length,
+      trend: result.trend.length,
+      dailySample: result.daily?.[0],
+    });
+    return result;
   }, [filters.endDate, filters.selectedCity, filters.startDate, filteredDevices, historicalData.data]);
 
   useEffect(() => {

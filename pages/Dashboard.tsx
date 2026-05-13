@@ -7,6 +7,7 @@ import FilterPanel from '../components/FilterPanel';
 import ChartContainer from '../components/charts/ChartContainer';
 import { Device, RealtimeData } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { buildTmatChartSeries } from '../utils/tmatChartAggregation';
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -275,152 +276,17 @@ const Dashboard: React.FC = () => {
   }, [filteredDevices, fetchHistoricalByDevices]);
 
   useEffect(() => {
-    // 2. Prepare Chart Data from historical realtime_device data
-    if (chartRealtimeData && chartRealtimeData.length > 0) {
-      const deviceIds = filteredDevices.map(d => d.device_id_unik);
-      let relevantData = chartRealtimeData.filter(r => deviceIds.includes(r.device_id_unik));
+    const series = buildTmatChartSeries(
+      chartRealtimeData,
+      filteredDevices,
+      filters.startDate,
+      filters.endDate,
+      filters.selectedCity
+    );
 
-      // If a city is selected, filter devices by that city first
-      let applicableDevices = filteredDevices; // Track which devices to use for offline calculation
-      if (filters.selectedCity) {
-        const cityDevices = filteredDevices.filter((d) => getSelectedCityValue(d) === filters.selectedCity);
-        applicableDevices = cityDevices;
-        const cityDeviceIds = cityDevices.map(d => d.device_id_unik);
-        relevantData = relevantData.filter(r => cityDeviceIds.includes(r.device_id_unik));
-      }
-
-      // Only count aktif devices
-      const aktifDevices = applicableDevices.filter(d => d.status === 'aktif');
-      const aktifDeviceIds = aktifDevices.map(d => d.device_id_unik);
-
-      // Apply date filters if set
-      if (filters.startDate || filters.endDate) {
-        relevantData = relevantData.filter(r => {
-          const dataDate = extractDatePart(r.timestamp_data);
-          if (!dataDate) return false;
-          const matchesStart = !filters.startDate || dataDate >= filters.startDate;
-          const matchesEnd = !filters.endDate || dataDate <= filters.endDate;
-          return matchesStart && matchesEnd;
-        });
-      }
-
-      // Charts should represent one status per active device per period.
-      // Counting every reading inflates categories on pages that fetch raw history.
-      relevantData = relevantData.filter((r) => aktifDeviceIds.includes(r.device_id_unik));
-
-      const classifyTmatValue = (value: number) => {
-        if (!Number.isFinite(value)) return 'offline' as const;
-        if (value > 0) return 'tergenang' as const;
-        if (value >= -40) return 'normal' as const;
-        if (value >= -80) return 'rawan' as const;
-        return 'sangat_rawan' as const;
-      };
-
-      // DAILY AGGREGATION
-      const dailyAggregation: { [date: string]: { tergenang: number; normal: number; rawan: number; sangat_rawan: number; offline: number } } = {};
-
-      const latestDailyByDevice = new Map<string, RealtimeData>();
-      relevantData.forEach((r) => {
-        const date = extractDatePart(r.timestamp_data);
-        if (!date) return;
-        const key = `${date}::${r.device_id_unik}`;
-        const existing = latestDailyByDevice.get(key);
-        if (!existing || getTimestampSortValue(r.timestamp_data) > getTimestampSortValue(existing.timestamp_data)) {
-          latestDailyByDevice.set(key, r);
-        }
-      });
-
-      latestDailyByDevice.forEach((r) => {
-        const date = extractDatePart(r.timestamp_data);
-        if (!date) return;
-        if (!dailyAggregation[date]) {
-          dailyAggregation[date] = { tergenang: 0, normal: 0, rawan: 0, sangat_rawan: 0, offline: 0 };
-        }
-        dailyAggregation[date][classifyTmatValue(r.tmat_value)]++;
-      });
-
-      // Add offline devices count for each day
-      Object.keys(dailyAggregation).forEach(date => {
-        const devicesWithDataOnDate = new Set(
-          Array.from(latestDailyByDevice.values())
-            .filter(r => extractDatePart(r.timestamp_data) === date)
-            .map(r => r.device_id_unik)
-        );
-        // Offline = aktif devices - devices that reported on this day
-        dailyAggregation[date].offline = aktifDeviceIds.length - devicesWithDataOnDate.size;
-      });
-
-      // Convert to chart format and sort by date
-      const dailyChartArray = Object.entries(dailyAggregation)
-        .map(([date, counts]) => ({ date, ...counts }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-      
-      setChartData(dailyChartArray.length > 0 ? dailyChartArray : []);
-
-      // WEEKLY AGGREGATION
-      const weeklyAggregation: { [weekStart: string]: { tergenang: number; normal: number; rawan: number; sangat_rawan: number; offline: number } } = {};
-
-      const latestWeeklyByDevice = new Map<string, RealtimeData>();
-      relevantData.forEach((r) => {
-        const date = extractDatePart(r.timestamp_data);
-        if (!date) return;
-        const weekStart = getWeekStart(date);
-        const key = `${weekStart}::${r.device_id_unik}`;
-        const existing = latestWeeklyByDevice.get(key);
-        if (!existing || getTimestampSortValue(r.timestamp_data) > getTimestampSortValue(existing.timestamp_data)) {
-          latestWeeklyByDevice.set(key, r);
-        }
-      });
-
-      latestWeeklyByDevice.forEach((r) => {
-        const date = extractDatePart(r.timestamp_data);
-        if (!date) return;
-        const weekStart = getWeekStart(date);
-        if (!weeklyAggregation[weekStart]) {
-          weeklyAggregation[weekStart] = { tergenang: 0, normal: 0, rawan: 0, sangat_rawan: 0, offline: 0 };
-        }
-        weeklyAggregation[weekStart][classifyTmatValue(r.tmat_value)]++;
-      });
-
-      // Add offline devices count for each week
-      Object.keys(weeklyAggregation).forEach(weekStart => {
-        const devicesWithDataInWeek = new Set(
-          Array.from(latestWeeklyByDevice.values())
-            .filter(r => {
-              const date = extractDatePart(r.timestamp_data);
-              return date ? getWeekStart(date) === weekStart : false;
-            })
-            .map(r => r.device_id_unik)
-        );
-        // Offline = aktif devices - devices that reported in this week
-        weeklyAggregation[weekStart].offline = aktifDeviceIds.length - devicesWithDataInWeek.size;
-      });
-      
-      // Convert to chart format with week labels
-      const weeklyChartArray = Object.entries(weeklyAggregation)
-        .map(([weekStart, counts]) => ({ 
-          date: formatWeekLabel(weekStart),
-          dateKey: weekStart,
-          ...counts 
-        }))
-        .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-      
-      setWeeklyChartData(weeklyChartArray.length > 0 ? weeklyChartArray : []);
-
-      // Line Chart: TMAT Trend (last 10 readings)
-      const trendDataArray = relevantData
-        .slice(-10)
-        .map(d => ({
-          time: extractTimePart(d.timestamp_data) || String(d.timestamp_data || ''), // Time only, fallback to full timestamp
-          tmat: d.tmat_value
-        }));
-      
-      setTrendData(trendDataArray);
-    } else {
-      setChartData([]);
-      setWeeklyChartData([]);
-      setTrendData([]);
-    }
+    setChartData(series.daily);
+    setWeeklyChartData(series.weekly);
+    setTrendData(series.trend);
   }, [filters, filteredDevices, chartRealtimeData]);
 
   // Handle loading and errors

@@ -1,18 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import DashboardMap from '../components/DashboardMap';
 import ChartContainer from '../components/charts/ChartContainer';
-import { usePublicMapAnalytics, usePublicMapDevices, usePublicMapSummary } from '../services/useApi';
+import { useHistoricalDataAllChunks, usePublicMapDevices, usePublicMapSummary } from '../services/useApi';
 import { useFilters } from '../context/FilterContext';
 import { Device } from '../types';
-
-// Helper to create readable week labels
-const formatWeekLabel = (startDate: string): string => {
-  const start = new Date(startDate + 'T00:00:00');
-  const end = new Date(startDate + 'T00:00:00');
-  end.setDate(end.getDate() + 6);
-  return `${start.toLocaleDateString('en-CA')} - ${end.toLocaleDateString('en-CA')}`;
-};
+import { buildTmatChartSeries } from '../utils/tmatChartAggregation';
 
 const normalizeRegionValue = (value?: string | null): string => {
   return (value || '')
@@ -25,9 +18,8 @@ const normalizeRegionValue = (value?: string | null): string => {
 
 const FullMap: React.FC = () => {
   const { t } = useTranslation();
-  const { filters, updateFilter, setTimePeriod } = useFilters();
+  const { filters, updateFilter } = useFilters();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
-  const publicDateInitializedRef = useRef(false);
   const publicFilterInitializedRef = useRef(false);
 
   const getSelectedCityValue = (device: Device): string => {
@@ -53,12 +45,6 @@ const FullMap: React.FC = () => {
     jenis_perusahaan: filters.jenis_perusahaan || '',
   }), [filters.provinsi, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan]);
 
-  const publicAnalyticsFilters = useMemo(() => ({
-    ...publicLocationFilters,
-    start_date: filters.startDate || '',
-    end_date: filters.endDate || '',
-  }), [publicLocationFilters, filters.startDate, filters.endDate]);
-
   const {
     data: publicSummary,
     loading: summaryLoading,
@@ -72,57 +58,6 @@ const FullMap: React.FC = () => {
     refetch: refetchDevices,
   } = usePublicMapDevices(publicLocationFilters);
 
-  const selectedCityLocationFilters = useMemo(() => {
-    if (!filters.selectedCity || !publicDevices || publicDevices.length === 0) {
-      return {};
-    }
-
-    const selectedCityValue = normalizeRegionValue(filters.selectedCity);
-    const matchingDevice = publicDevices.find((device) => {
-      const deviceCity = normalizeRegionValue(device.desa);
-      const deviceKabupaten = normalizeRegionValue(device.kabupaten_nama || device.kabupaten_id);
-      const deviceProvinsi = normalizeRegionValue(device.provinsi_nama || device.provinsi_id);
-
-      return (
-        deviceCity === selectedCityValue ||
-        deviceKabupaten === selectedCityValue ||
-        deviceProvinsi === selectedCityValue
-      );
-    });
-
-    if (!matchingDevice) {
-      return {};
-    }
-
-    if (normalizeRegionValue(matchingDevice.desa) === selectedCityValue) {
-      return { desa: matchingDevice.desa || '' };
-    }
-
-    if (
-      normalizeRegionValue(matchingDevice.kabupaten_nama || matchingDevice.kabupaten_id) === selectedCityValue
-    ) {
-      return { kabupaten: matchingDevice.kabupaten_nama || matchingDevice.kabupaten_id || '' };
-    }
-
-    if (
-      normalizeRegionValue(matchingDevice.provinsi_nama || matchingDevice.provinsi_id) === selectedCityValue
-    ) {
-      return { provinsi: matchingDevice.provinsi_nama || matchingDevice.provinsi_id || '' };
-    }
-
-    return {};
-  }, [filters.selectedCity, publicDevices]);
-
-  const {
-    data: publicAnalytics,
-    loading: analyticsLoading,
-    error: analyticsError,
-    refetch: refetchAnalytics,
-  } = usePublicMapAnalytics({
-    ...publicAnalyticsFilters,
-    ...selectedCityLocationFilters,
-  });
-
   useEffect(() => {
     if (!isPublicMapRoute || publicFilterInitializedRef.current) {
       return;
@@ -134,21 +69,6 @@ const FullMap: React.FC = () => {
       updateFilter('selectedCity', null);
     }
   }, [isPublicMapRoute, filters.selectedCity, updateFilter]);
-
-  useEffect(() => {
-    if (!isPublicMapRoute || publicDateInitializedRef.current || !publicSummary) {
-      return;
-    }
-
-    if (!publicSummary.default_start_date || !publicSummary.default_end_date) {
-      return;
-    }
-
-    publicDateInitializedRef.current = true;
-    setTimePeriod('custom');
-    updateFilter('startDate', publicSummary.default_start_date);
-    updateFilter('endDate', publicSummary.default_end_date);
-  }, [publicSummary, isPublicMapRoute, setTimePeriod, updateFilter]);
 
   const filteredDevices = useMemo(() => {
     if (!publicDevices) return [];
@@ -224,6 +144,24 @@ const FullMap: React.FC = () => {
       }));
   }, [publicDevices, filters.selectedCity]);
 
+  const historicalData = useHistoricalDataAllChunks(
+    filteredDevices,
+    filters.startDate || '',
+    filters.endDate || '',
+    undefined,
+    filteredDevices.length > 0 && !!filters.startDate && !!filters.endDate
+  );
+
+  const chartData = useMemo(() => {
+    return buildTmatChartSeries(
+      historicalData.data,
+      filteredDevices,
+      filters.startDate,
+      filters.endDate,
+      filters.selectedCity
+    );
+  }, [filters.endDate, filters.selectedCity, filters.startDate, filteredDevices, historicalData.data]);
+
   useEffect(() => {
     if (!filters.selectedCity || filteredDevices.length === 0) {
       return;
@@ -234,25 +172,6 @@ const FullMap: React.FC = () => {
       updateFilter('selectedCity', null);
     }
   }, [filteredDevices, filters.selectedCity, updateFilter]);
-
-  const dailyChartData = useMemo(() => {
-    return publicAnalytics?.daily || [];
-  }, [publicAnalytics]);
-
-  const weeklyChartData = useMemo(() => {
-    return (publicAnalytics?.weekly || []).map((item) => ({
-      ...item,
-      date: formatWeekLabel(item.week),
-      dateKey: item.week,
-    }));
-  }, [publicAnalytics]);
-
-  const trendData = useMemo(() => {
-    return (publicAnalytics?.trend || []).map((item) => ({
-      time: item.time,
-      tmat: item.tmat,
-    }));
-  }, [publicAnalytics]);
 
   const criticalCount = useMemo(() => {
     if (!latestRealtimeData.length || !filteredDevices.length) {
@@ -266,8 +185,8 @@ const FullMap: React.FC = () => {
     }, 0);
   }, [filteredDevices, latestRealtimeData, publicSummary?.critical_devices]);
 
-  const isLoading = summaryLoading || devicesLoading || analyticsLoading;
-  const hasError = summaryError || devicesError || analyticsError;
+  const isLoading = summaryLoading || devicesLoading || historicalData.isLoading;
+  const hasError = summaryError || devicesError || historicalData.error;
 
   if (isLoading) {
     return (
@@ -288,14 +207,13 @@ const FullMap: React.FC = () => {
         <div className="bg-white border border-red-200 rounded-xl p-6 shadow-sm space-y-3 max-w-md">
           <h3 className="font-bold text-red-800">Error loading data</h3>
           <p className="text-red-600">
-            {summaryError?.message || devicesError?.message || analyticsError?.message}
+            {summaryError?.message || devicesError?.message || historicalData.error?.message}
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => {
                 refetchSummary();
                 refetchDevices();
-                refetchAnalytics();
               }}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
             >
@@ -317,7 +235,6 @@ const FullMap: React.FC = () => {
           </p>
         </div>
 
-        {/* Location Filter Display */}
         {(filters.provinsi || filters.kabupaten) && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
             <p className="text-sm text-blue-700 font-medium">
@@ -326,7 +243,6 @@ const FullMap: React.FC = () => {
           </div>
         )}
 
-        {/* Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-sm text-slate-500">{t('dashboard:metrics.totalStations')}</p>
@@ -344,7 +260,6 @@ const FullMap: React.FC = () => {
           </div>
         </div>
 
-        {/* Selected City Banner */}
         {filters.selectedCity && (
           <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-xl px-4 py-3">
             <p className="text-xs text-slate-600 font-semibold mb-1">
@@ -365,13 +280,13 @@ const FullMap: React.FC = () => {
           />
         </section>
 
-        {/* Charts */}
         <ChartContainer
           chartView={chartView}
           setChartView={setChartView}
-          dailyData={dailyChartData}
-          weeklyData={weeklyChartData}
-          trendData={trendData}
+          dailyData={chartData.daily}
+          weeklyData={chartData.weekly}
+          trendData={chartData.trend}
+          isLoading={historicalData.isLoading}
           selectedCity={filters.selectedCity || undefined}
         />
       </div>

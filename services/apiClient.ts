@@ -76,10 +76,19 @@ function normalizeRealtimeData(raw: any): RealtimeData {
     suhu_value: normalizeNumericValue(raw.suhu_value),
     ph_value: normalizeNumericValue(raw.ph_value),
     curah_hujan: normalizeNumericValue(
-      raw.curah_hujan ?? raw.curah_hujan_value ?? raw.rain_value ?? raw.rainfall ?? raw.rainfall_value
+      raw.curah_hujan ??
+        raw.curah_hujan_value ??
+        raw.hujan_value ??
+        raw.rain_value ??
+        raw.rainfall ??
+        raw.rainfall_value
     ),
     kelembapan: normalizeNumericValue(
-      raw.kelembapan ?? raw.kelembapan_value ?? raw.humidity ?? raw.humidity_value
+      raw.kelembapan ??
+        raw.kelembapan_value ??
+        raw.kelembapan_tanah ??
+        raw.humidity ??
+        raw.humidity_value
     ),
   };
 }
@@ -88,8 +97,14 @@ function normalizePublicLatestRealtime(raw: any) {
   return {
     timestamp_data: raw?.timestamp_data ?? null,
     tmat_value: raw?.tmat_value == null ? null : normalizeNumericValue(raw.tmat_value),
-    curah_hujan: raw?.curah_hujan == null ? null : normalizeNumericValue(raw.curah_hujan),
-    kelembapan: raw?.kelembapan == null ? null : normalizeNumericValue(raw.kelembapan),
+    curah_hujan:
+      raw?.curah_hujan == null
+        ? (raw?.hujan_value == null ? null : normalizeNumericValue(raw.hujan_value))
+        : normalizeNumericValue(raw.curah_hujan),
+    kelembapan:
+      raw?.kelembapan == null
+        ? (raw?.kelembapan_tanah == null ? null : normalizeNumericValue(raw.kelembapan_tanah))
+        : normalizeNumericValue(raw.kelembapan),
     suhu_value: raw?.suhu_value == null ? null : normalizeNumericValue(raw.suhu_value),
   };
 }

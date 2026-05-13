@@ -66,25 +66,22 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   }, []);
 
   // Function to convert data to CSV and trigger download
-        columnStyles: {
-          0: { halign: 'left', cellWidth: 50 },
-          1: { fillColor: [59, 130, 246] },
-          2: { fillColor: [34, 197, 94] },
-          3: { fillColor: [249, 115, 22] },
-          4: { fillColor: [239, 68, 68] },
-          5: { fillColor: [148, 163, 184] },
-          6: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' }
-        }
+  const downloadCSV = (data: any[], filename: string) => {
+    if (data.length === 0) return;
+
+    const headers = ['Date', 'Tergenang', 'Normal', 'Rawan', 'Sangat Rawan', 'Offline'];
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => [
         row.date,
         row.tergenang || 0,
         row.normal || 0,
         row.rawan || 0,
         row.sangat_rawan || 0,
-        row.offline || 0
+        row.offline || 0,
       ].join(','))
     ].join('\n');
 
-    // Create blob and download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);

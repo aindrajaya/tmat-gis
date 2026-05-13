@@ -10,12 +10,10 @@ interface StatusTrendChartProps {
 const StatusTrendChart = forwardRef<HTMLDivElement, StatusTrendChartProps>(({ data, chartView }, ref) => {
   const { t } = useTranslation();
   const statusOrder: Record<string, number> = {
-    extreme: 0,
-    veryhigh: 1,
-    high: 2,
-    medium: 3,
-    low: 4,
-    safe: 5,
+    sangat_rawan: 0,
+    rawan: 1,
+    normal: 2,
+    tergenang: 3,
     offline: 6,
   };
   const CustomLegend = ({ payload }: any) => {
@@ -77,12 +75,10 @@ const StatusTrendChart = forwardRef<HTMLDivElement, StatusTrendChartProps>(({ da
           <YAxis fontSize={12} />
           <RechartsTooltip content={<CustomTooltip />} />
           <Legend verticalAlign="bottom" align="center" content={<CustomLegend />} />
-          <Line type="monotone" dataKey="extreme" stroke="#EE0000" strokeWidth={2} dot={false} name="Ekstrim" />
-          <Line type="monotone" dataKey="veryhigh" stroke="#FFC000" strokeWidth={2} dot={false} name="Sangat Tinggi" />
-          <Line type="monotone" dataKey="high" stroke="#F2D335" strokeWidth={2} dot={false} name="Tinggi" />
-          <Line type="monotone" dataKey="medium" stroke="#00B0F0" strokeWidth={2} dot={false} name="Sedang" />
-          <Line type="monotone" dataKey="low" stroke="#00B050" strokeWidth={2} dot={false} name="Rendah" />
-          <Line type="monotone" dataKey="safe" stroke="#703CA0" strokeWidth={2} dot={false} name="Tidak Beresiko" />
+          <Line type="monotone" dataKey="sangat_rawan" stroke="#EF4444" strokeWidth={2} dot={false} name="Sangat Rawan" />
+          <Line type="monotone" dataKey="rawan" stroke="#F97316" strokeWidth={2} dot={false} name="Rawan" />
+          <Line type="monotone" dataKey="normal" stroke="#22C55E" strokeWidth={2} dot={false} name="Normal" />
+          <Line type="monotone" dataKey="tergenang" stroke="#3B82F6" strokeWidth={2} dot={false} name="Tergenang" />
           <Line type="monotone" dataKey="offline" stroke="#9CA3AF" strokeWidth={2} dot={false} name="Offline" />
         </LineChart>
       </ResponsiveContainer>

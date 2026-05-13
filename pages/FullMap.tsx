@@ -170,8 +170,16 @@ const FullMap: React.FC = () => {
   }, [publicAnalytics]);
 
   const criticalCount = useMemo(() => {
-    return publicSummary?.critical_devices || 0;
-  }, [publicSummary]);
+    if (!latestRealtimeData.length || !filteredDevices.length) {
+      return publicSummary?.critical_devices || 0;
+    }
+
+    const deviceIds = new Set(filteredDevices.map((device) => device.device_id_unik));
+    return latestRealtimeData.reduce((count, item) => {
+      if (!deviceIds.has(item.device_id_unik)) return count;
+      return Number.isFinite(item.tmat_value) && item.tmat_value <= -80 ? count + 1 : count;
+    }, 0);
+  }, [filteredDevices, latestRealtimeData, publicSummary?.critical_devices]);
 
   const isLoading = summaryLoading || devicesLoading || analyticsLoading;
   const hasError = summaryError || devicesError || analyticsError;

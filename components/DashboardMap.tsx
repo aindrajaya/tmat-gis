@@ -410,62 +410,42 @@ const WaterLevelLegend: React.FC<{ onToggle: () => void; isOpen: boolean; showDi
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#703CA0] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#3B82F6] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
+                {isIndonesian ? 'Tergenang' : 'Flooded'}
               </p>
-              <p className="text-[10px] text-slate-500">TMAT ≥ 0</p>
+              <p className="text-[10px] text-slate-500">TMAT &gt; 0 cm</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#00B050] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#22C55E] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Rendah' : 'Low'}
+                {isIndonesian ? 'Normal' : 'Normal'}
               </p>
-              <p className="text-[10px] text-slate-500">0 - 20 cm</p>
+              <p className="text-[10px] text-slate-500">-40 cm &lt; nilai ≤ 0 cm</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#00B0F0] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#F97316] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Sedang' : 'Medium'}
+                {isIndonesian ? 'Rawan' : 'At Risk'}
               </p>
-              <p className="text-[10px] text-slate-500">20 - 40 cm</p>
+              <p className="text-[10px] text-slate-500">-80 cm &lt; nilai ≤ -40 cm</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#F2D335] flex-shrink-0"></div>
+            <div className="w-3 h-3 rounded-full bg-[#EF4444] flex-shrink-0"></div>
             <div className="flex-1">
               <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Tinggi' : 'High'}
+                {isIndonesian ? 'Sangat Rawan' : 'Very Risky'}
               </p>
-              <p className="text-[10px] text-slate-500">40 - 60 cm</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#FFC000] flex-shrink-0"></div>
-            <div className="flex-1">
-              <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
-              </p>
-              <p className="text-[10px] text-slate-500">60 - 80 cm</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#EE0000] flex-shrink-0"></div>
-            <div className="flex-1">
-              <p className="font-semibold text-slate-700 text-xs">
-                {isIndonesian ? 'Ekstrim' : 'Extreme'}
-              </p>
-              <p className="text-[10px] text-slate-500">{'> 80 cm'}</p>
+              <p className="text-[10px] text-slate-500">≤ -80 cm</p>
             </div>
           </div>
 
@@ -973,12 +953,10 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
       centerLat: number;
       centerLng: number;
       stats: {
-        safe: number;
-        low: number;
-        medium: number;
-        high: number;
-        veryhigh: number;
-        extreme: number;
+        tergenang: number;
+        normal: number;
+        rawan: number;
+        sangat_rawan: number;
         offline: number;
       };
     }> = useMemo(() => {
@@ -989,12 +967,10 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
       centerLat: number;
       centerLng: number;
       stats: {
-        safe: number;
-        low: number;
-        medium: number;
-        high: number;
-        veryhigh: number;
-        extreme: number;
+        tergenang: number;
+        normal: number;
+        rawan: number;
+        sangat_rawan: number;
         offline: number;
       };
     }>();
@@ -1014,12 +990,10 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
           centerLat: 0,
           centerLng: 0,
           stats: {
-            safe: 0,
-            low: 0,
-            medium: 0,
-            high: 0,
-            veryhigh: 0,
-            extreme: 0,
+            tergenang: 0,
+            normal: 0,
+            rawan: 0,
+            sangat_rawan: 0,
             offline: 0
           }
         });
@@ -1056,12 +1030,10 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
   // Calculate statistics
   const stats = useMemo(() => {
     const statusCounts = {
-      safe: 0,
-      low: 0,
-      medium: 0,
-      high: 0,
-      veryhigh: 0,
-      extreme: 0,
+      tergenang: 0,
+      normal: 0,
+      rawan: 0,
+      sangat_rawan: 0,
       offline: 0
     };
 
@@ -1488,28 +1460,20 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
             </svg>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#EE0000]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.extreme}</span>
+                <div className="w-2 h-2 rounded-full bg-[#EF4444]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.sangat_rawan}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#FFC000]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.veryhigh}</span>
+                <div className="w-2 h-2 rounded-full bg-[#F97316]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.rawan}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#F2D335]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.high}</span>
+                <div className="w-2 h-2 rounded-full bg-[#22C55E]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.normal}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#00B0F0]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.medium}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#00B050]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.low}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#703CA0]"></div>
-                <span className="text-xs font-bold text-slate-700">{stats.safe}</span>
+                <div className="w-2 h-2 rounded-full bg-[#3B82F6]"></div>
+                <span className="text-xs font-bold text-slate-700">{stats.tergenang}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-slate-400"></div>
@@ -1555,57 +1519,37 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
                     {isIndonesian ? 'Ekstrim' : 'Extreme'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-red-700">{stats.extreme}</span>
+                <span className="text-sm font-bold text-red-700">{stats.sangat_rawan}</span>
               </div>
 
               <div className="flex items-center justify-between p-2 bg-amber-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#FFC000]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#F97316]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Sangat Tinggi' : 'Very High'}
+                    {isIndonesian ? 'Rawan' : 'At Risk'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-amber-700">{stats.veryhigh}</span>
+                <span className="text-sm font-bold text-amber-700">{stats.rawan}</span>
               </div>
 
               <div className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#F2D335]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#22C55E]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Tinggi' : 'High'}
+                    {isIndonesian ? 'Normal' : 'Normal'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-yellow-800">{stats.high}</span>
+                <span className="text-sm font-bold text-yellow-800">{stats.normal}</span>
               </div>
 
               <div className="flex items-center justify-between p-2 bg-cyan-50 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#00B0F0]"></div>
+                  <div className="w-3 h-3 rounded-full bg-[#3B82F6]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Sedang' : 'Medium'}
+                    {isIndonesian ? 'Tergenang' : 'Flooded'}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-cyan-700">{stats.medium}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#00B050]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Rendah' : 'Low'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-green-700">{stats.low}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#703CA0]"></div>
-                  <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Tidak Beresiko' : 'No Risk'}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-purple-700">{stats.safe}</span>
+                <span className="text-sm font-bold text-cyan-700">{stats.tergenang}</span>
               </div>
 
               {stats.offline > 0 && (

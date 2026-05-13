@@ -66,23 +66,21 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
   }, []);
 
   // Function to convert data to CSV and trigger download
-  const downloadCSV = (data: any[], filename: string) => {
-    if (data.length === 0) return;
-
-    // Define headers based on the data structure
-    const headers = ['Date', 'Safe', 'Low', 'Medium', 'High', 'Very High', 'Extreme'];
-
-    // Build CSV content
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => [
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 50 },
+          1: { fillColor: [59, 130, 246] },
+          2: { fillColor: [34, 197, 94] },
+          3: { fillColor: [249, 115, 22] },
+          4: { fillColor: [239, 68, 68] },
+          5: { fillColor: [148, 163, 184] },
+          6: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' }
+        }
         row.date,
-        row.safe || 0,
-        row.low || 0,
-        row.medium || 0,
-        row.high || 0,
-        row.veryhigh || 0,
-        row.extreme || 0
+        row.tergenang || 0,
+        row.normal || 0,
+        row.rawan || 0,
+        row.sangat_rawan || 0,
+        row.offline || 0
       ].join(','))
     ].join('\n');
 
@@ -131,34 +129,32 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
 
     // Prepare table data
-    const headers = [['Date', 'Safe', 'Low', 'Medium', 'High', 'Very High', 'Extreme', 'Total']];
+    const headers = [['Date', 'Tergenang', 'Normal', 'Rawan', 'Sangat Rawan', 'Offline', 'Total']];
     const tableData = data.map(row => {
-      const total = (row.safe || 0) + (row.low || 0) + (row.medium || 0) +
-                    (row.high || 0) + (row.veryhigh || 0) + (row.extreme || 0);
+      const total = (row.tergenang || 0) + (row.normal || 0) + (row.rawan || 0) +
+                    (row.sangat_rawan || 0) + (row.offline || 0);
       return [
         row.date,
-        row.safe || 0,
-        row.low || 0,
-        row.medium || 0,
-        row.high || 0,
-        row.veryhigh || 0,
-        row.extreme || 0,
+        row.tergenang || 0,
+        row.normal || 0,
+        row.rawan || 0,
+        row.sangat_rawan || 0,
+        row.offline || 0,
         total
       ];
     });
 
     // Add totals row
     const totals = data.reduce((acc, row) => ({
-      safe: acc.safe + (row.safe || 0),
-      low: acc.low + (row.low || 0),
-      medium: acc.medium + (row.medium || 0),
-      high: acc.high + (row.high || 0),
-      veryhigh: acc.veryhigh + (row.veryhigh || 0),
-      extreme: acc.extreme + (row.extreme || 0),
-    }), { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 });
+      tergenang: acc.tergenang + (row.tergenang || 0),
+      normal: acc.normal + (row.normal || 0),
+      rawan: acc.rawan + (row.rawan || 0),
+      sangat_rawan: acc.sangat_rawan + (row.sangat_rawan || 0),
+      offline: acc.offline + (row.offline || 0),
+    }), { tergenang: 0, normal: 0, rawan: 0, sangat_rawan: 0, offline: 0 });
 
-    const grandTotal = totals.safe + totals.low + totals.medium + totals.high + totals.veryhigh + totals.extreme;
-    tableData.push(['TOTAL', totals.safe, totals.low, totals.medium, totals.high, totals.veryhigh, totals.extreme, grandTotal]);
+    const grandTotal = totals.tergenang + totals.normal + totals.rawan + totals.sangat_rawan + totals.offline;
+    tableData.push(['TOTAL', totals.tergenang, totals.normal, totals.rawan, totals.sangat_rawan, totals.offline, grandTotal]);
 
     // Generate table with colors
     autoTable(doc, {
@@ -177,13 +173,12 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       },
       columnStyles: {
         0: { halign: 'left', cellWidth: 50 },
-        1: { fillColor: [112, 60, 160] }, // Safe - purple
-        2: { fillColor: [0, 176, 80] },   // Low - green
-        3: { fillColor: [0, 176, 240] },  // Medium - light blue
-        4: { fillColor: [255, 255, 0], textColor: [0, 0, 0] },  // High - yellow
-        5: { fillColor: [255, 192, 0], textColor: [0, 0, 0] },  // Very High - orange
-        6: { fillColor: [238, 0, 0] },    // Extreme - red
-        7: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' } // Total
+        1: { fillColor: [59, 130, 246] },   // Tergenang - blue
+        2: { fillColor: [34, 197, 94] },    // Normal - green
+        3: { fillColor: [249, 115, 22] },   // Rawan - orange
+        4: { fillColor: [239, 68, 68] },    // Sangat Rawan - red
+        5: { fillColor: [148, 163, 184] },  // Offline - slate
+        6: { fillColor: [241, 245, 249], textColor: [30, 41, 59], fontStyle: 'bold' } // Total
       },
       didParseCell: (data) => {
         // Make last row bold (totals)
@@ -222,39 +217,36 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
 
     // Prepare data with headers
     const excelData = data.map(row => {
-      const total = (row.safe || 0) + (row.low || 0) + (row.medium || 0) +
-                    (row.high || 0) + (row.veryhigh || 0) + (row.extreme || 0);
+      const total = (row.tergenang || 0) + (row.normal || 0) + (row.rawan || 0) +
+                    (row.sangat_rawan || 0) + (row.offline || 0);
       return {
         'Date': row.date,
-        'Safe (>= 0m)': row.safe || 0,
-        'Low (-0.2m to 0m)': row.low || 0,
-        'Medium (-0.4m to -0.2m)': row.medium || 0,
-        'High (-0.5m to -0.4m)': row.high || 0,
-        'Very High (-0.6m to -0.5m)': row.veryhigh || 0,
-        'Extreme (< -0.6m)': row.extreme || 0,
+        'Tergenang': row.tergenang || 0,
+        'Normal': row.normal || 0,
+        'Rawan': row.rawan || 0,
+        'Sangat Rawan': row.sangat_rawan || 0,
+        'Offline': row.offline || 0,
         'Total': total
       };
     });
 
     // Add totals row
     const totals = data.reduce((acc, row) => ({
-      safe: acc.safe + (row.safe || 0),
-      low: acc.low + (row.low || 0),
-      medium: acc.medium + (row.medium || 0),
-      high: acc.high + (row.high || 0),
-      veryhigh: acc.veryhigh + (row.veryhigh || 0),
-      extreme: acc.extreme + (row.extreme || 0),
-    }), { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 });
+      tergenang: acc.tergenang + (row.tergenang || 0),
+      normal: acc.normal + (row.normal || 0),
+      rawan: acc.rawan + (row.rawan || 0),
+      sangat_rawan: acc.sangat_rawan + (row.sangat_rawan || 0),
+      offline: acc.offline + (row.offline || 0),
+    }), { tergenang: 0, normal: 0, rawan: 0, sangat_rawan: 0, offline: 0 });
 
-    const grandTotal = totals.safe + totals.low + totals.medium + totals.high + totals.veryhigh + totals.extreme;
+    const grandTotal = totals.tergenang + totals.normal + totals.rawan + totals.sangat_rawan + totals.offline;
     excelData.push({
       'Date': 'TOTAL',
-      'Safe (>= 0m)': totals.safe,
-      'Low (-0.2m to 0m)': totals.low,
-      'Medium (-0.4m to -0.2m)': totals.medium,
-      'High (-0.5m to -0.4m)': totals.high,
-      'Very High (-0.6m to -0.5m)': totals.veryhigh,
-      'Extreme (< -0.6m)': totals.extreme,
+      'Tergenang': totals.tergenang,
+      'Normal': totals.normal,
+      'Rawan': totals.rawan,
+      'Sangat Rawan': totals.sangat_rawan,
+      'Offline': totals.offline,
       'Total': grandTotal
     });
 
@@ -265,12 +257,11 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
     // Set column widths
     worksheet['!cols'] = [
       { wch: 25 }, // Date
-      { wch: 15 }, // Safe
-      { wch: 18 }, // Low
-      { wch: 22 }, // Medium
-      { wch: 20 }, // High
-      { wch: 24 }, // Very High
-      { wch: 18 }, // Extreme
+      { wch: 15 }, // Tergenang
+      { wch: 15 }, // Normal
+      { wch: 15 }, // Rawan
+      { wch: 18 }, // Sangat Rawan
+      { wch: 12 }, // Offline
       { wch: 10 }, // Total
     ];
 
@@ -423,34 +414,32 @@ const ChartContainer: React.FC<ChartContainerProps> = ({
       doc.text(`Detailed Data - ${title}`, margin, 15);
 
       // Prepare table data
-      const headers = [['Date', 'Safe', 'Low', 'Medium', 'High', 'Very High', 'Extreme', 'Total']];
+      const headers = [['Date', 'Tergenang', 'Normal', 'Rawan', 'Sangat Rawan', 'Offline', 'Total']];
       const tableData = data.map(row => {
-        const total = (row.safe || 0) + (row.low || 0) + (row.medium || 0) +
-                      (row.high || 0) + (row.veryhigh || 0) + (row.extreme || 0);
+        const total = (row.tergenang || 0) + (row.normal || 0) + (row.rawan || 0) +
+                      (row.sangat_rawan || 0) + (row.offline || 0);
         return [
           row.date,
-          row.safe || 0,
-          row.low || 0,
-          row.medium || 0,
-          row.high || 0,
-          row.veryhigh || 0,
-          row.extreme || 0,
+          row.tergenang || 0,
+          row.normal || 0,
+          row.rawan || 0,
+          row.sangat_rawan || 0,
+          row.offline || 0,
           total
         ];
       });
 
       // Add totals row
       const totals = data.reduce((acc, row) => ({
-        safe: acc.safe + (row.safe || 0),
-        low: acc.low + (row.low || 0),
-        medium: acc.medium + (row.medium || 0),
-        high: acc.high + (row.high || 0),
-        veryhigh: acc.veryhigh + (row.veryhigh || 0),
-        extreme: acc.extreme + (row.extreme || 0),
-      }), { safe: 0, low: 0, medium: 0, high: 0, veryhigh: 0, extreme: 0 });
+        tergenang: acc.tergenang + (row.tergenang || 0),
+        normal: acc.normal + (row.normal || 0),
+        rawan: acc.rawan + (row.rawan || 0),
+        sangat_rawan: acc.sangat_rawan + (row.sangat_rawan || 0),
+        offline: acc.offline + (row.offline || 0),
+      }), { tergenang: 0, normal: 0, rawan: 0, sangat_rawan: 0, offline: 0 });
 
-      const grandTotal = totals.safe + totals.low + totals.medium + totals.high + totals.veryhigh + totals.extreme;
-      tableData.push(['TOTAL', totals.safe, totals.low, totals.medium, totals.high, totals.veryhigh, totals.extreme, grandTotal]);
+        const grandTotal = totals.tergenang + totals.normal + totals.rawan + totals.sangat_rawan + totals.offline;
+        tableData.push(['TOTAL', totals.tergenang, totals.normal, totals.rawan, totals.sangat_rawan, totals.offline, grandTotal]);
 
       // Generate table with colors
       autoTable(doc, {

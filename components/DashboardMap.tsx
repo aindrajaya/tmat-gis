@@ -1516,7 +1516,7 @@ const DashboardMapInner = forwardRef<HTMLDivElement, DashboardMapInnerProps>(({ 
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-[#EE0000]"></div>
                   <span className="text-xs font-medium text-slate-700">
-                    {isIndonesian ? 'Ekstrim' : 'Extreme'}
+                    {isIndonesian ? 'Sangat Rawan' : 'Very Risky'}
                   </span>
                 </div>
                 <span className="text-sm font-bold text-red-700">{stats.sangat_rawan}</span>

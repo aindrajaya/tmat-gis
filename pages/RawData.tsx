@@ -20,6 +20,12 @@ const formatMetric = (value: unknown, digits: number, suffix = ''): string => {
   return Number.isFinite(num) ? `${num.toFixed(digits)}${suffix}` : '—';
 };
 
+const formatOptionalMetric = (value: unknown, digits: number, suffix = ''): string => {
+  if (value === null || value === undefined || value === '') return '';
+  const num = Number(value);
+  return Number.isFinite(num) ? `${num.toFixed(digits)}${suffix}` : '';
+};
+
 const TableRow = memo(({ row }: TableRowProps) => (
   <tr className="hover:bg-slate-50 transition-colors">
     <td className="px-6 py-3 font-medium">{row.displayTimestamp || row.timestamp_data}</td>
@@ -30,8 +36,8 @@ const TableRow = memo(({ row }: TableRowProps) => (
       {formatMetric(row.tmat_value, 2, ' cm')}
     </td>
     <td className="px-6 py-3 text-right">{formatMetric(row.suhu_value, 1, '°C')}</td>
-    <td className="px-6 py-3 text-right">{formatMetric(row.curah_hujan, 1, ' mm')}</td>
-    <td className="px-6 py-3 text-right">{formatMetric(row.kelembapan, 1, '%')}</td>
+    <td className="px-6 py-3 text-right">{formatOptionalMetric(row.curah_hujan, 1, ' mm')}</td>
+    <td className="px-6 py-3 text-right">{formatOptionalMetric(row.kelembapan, 1, '%')}</td>
   </tr>
 ));
 
@@ -581,8 +587,8 @@ const RawData: React.FC = () => {
         row.location,
         formatMetric(row.tmat_value, 2, ' cm'),
         formatMetric(row.suhu_value, 1, '°C'),
-        formatMetric(row.curah_hujan ?? 0, 1, ' mm'),
-        formatMetric(row.kelembapan ?? 0, 1, '%')
+        formatOptionalMetric(row.curah_hujan, 1, ' mm'),
+        formatOptionalMetric(row.kelembapan, 1, '%')
       ].map(cell => `"${cell}"`).join(','))
     ].join('\n');
 
@@ -650,8 +656,8 @@ const RawData: React.FC = () => {
       row.location,
       formatMetric(row.tmat_value, 2, ' cm'),
       formatMetric(row.suhu_value, 1, '°C'),
-      formatMetric(row.curah_hujan ?? 0, 1, ' mm'),
-      formatMetric(row.kelembapan ?? 0, 1, '%')
+      formatOptionalMetric(row.curah_hujan, 1, ' mm'),
+      formatOptionalMetric(row.kelembapan, 1, '%')
     ]);
 
     // Add table
@@ -706,8 +712,8 @@ const RawData: React.FC = () => {
       row.location,
       parseNumericValue(row.tmat_value),
       parseNumericValue(row.suhu_value),
-      parseNumericValue(row.curah_hujan) ?? 0,
-      parseNumericValue(row.kelembapan) ?? 0,
+      parseNumericValue(row.curah_hujan),
+      parseNumericValue(row.kelembapan),
     ]);
 
     // Build a real XLSX worksheet (not delimiter-based text) to avoid CSV-like rendering.

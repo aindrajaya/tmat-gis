@@ -14,6 +14,15 @@ const formatWeekLabel = (startDate: string): string => {
   return `${start.toLocaleDateString('en-CA')} - ${end.toLocaleDateString('en-CA')}`;
 };
 
+const normalizeRegionValue = (value?: string | null): string => {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 const FullMap: React.FC = () => {
   const { t } = useTranslation();
   const { filters, updateFilter, setTimePeriod } = useFilters();
@@ -62,12 +71,57 @@ const FullMap: React.FC = () => {
     error: devicesError,
     refetch: refetchDevices,
   } = usePublicMapDevices(publicLocationFilters);
+
+  const selectedCityLocationFilters = useMemo(() => {
+    if (!filters.selectedCity || !publicDevices || publicDevices.length === 0) {
+      return {};
+    }
+
+    const selectedCityValue = normalizeRegionValue(filters.selectedCity);
+    const matchingDevice = publicDevices.find((device) => {
+      const deviceCity = normalizeRegionValue(device.desa);
+      const deviceKabupaten = normalizeRegionValue(device.kabupaten_nama || device.kabupaten_id);
+      const deviceProvinsi = normalizeRegionValue(device.provinsi_nama || device.provinsi_id);
+
+      return (
+        deviceCity === selectedCityValue ||
+        deviceKabupaten === selectedCityValue ||
+        deviceProvinsi === selectedCityValue
+      );
+    });
+
+    if (!matchingDevice) {
+      return {};
+    }
+
+    if (normalizeRegionValue(matchingDevice.desa) === selectedCityValue) {
+      return { desa: matchingDevice.desa || '' };
+    }
+
+    if (
+      normalizeRegionValue(matchingDevice.kabupaten_nama || matchingDevice.kabupaten_id) === selectedCityValue
+    ) {
+      return { kabupaten: matchingDevice.kabupaten_nama || matchingDevice.kabupaten_id || '' };
+    }
+
+    if (
+      normalizeRegionValue(matchingDevice.provinsi_nama || matchingDevice.provinsi_id) === selectedCityValue
+    ) {
+      return { provinsi: matchingDevice.provinsi_nama || matchingDevice.provinsi_id || '' };
+    }
+
+    return {};
+  }, [filters.selectedCity, publicDevices]);
+
   const {
     data: publicAnalytics,
     loading: analyticsLoading,
     error: analyticsError,
     refetch: refetchAnalytics,
-  } = usePublicMapAnalytics(publicAnalyticsFilters);
+  } = usePublicMapAnalytics({
+    ...publicAnalyticsFilters,
+    ...selectedCityLocationFilters,
+  });
 
   useEffect(() => {
     if (!isPublicMapRoute || publicFilterInitializedRef.current) {
@@ -99,7 +153,23 @@ const FullMap: React.FC = () => {
   const filteredDevices = useMemo(() => {
     if (!publicDevices) return [];
 
-    return publicDevices.map((device, index) => ({
+    const selectedCityValue = normalizeRegionValue(filters.selectedCity);
+
+    const visibleDevices = !selectedCityValue
+      ? publicDevices
+      : publicDevices.filter((device) => {
+          const deviceCity = normalizeRegionValue(device.desa);
+          const deviceKabupaten = normalizeRegionValue(device.kabupaten_nama || device.kabupaten_id);
+          const deviceProvinsi = normalizeRegionValue(device.provinsi_nama || device.provinsi_id);
+
+          return (
+            deviceCity === selectedCityValue ||
+            deviceKabupaten === selectedCityValue ||
+            deviceProvinsi === selectedCityValue
+          );
+        });
+
+    return visibleDevices.map((device, index) => ({
       id: index + 1,
       device_id_unik: device.device_id_unik,
       id_perusahaan: device.id_perusahaan || 0,
@@ -120,12 +190,27 @@ const FullMap: React.FC = () => {
       kabupaten_nama: device.kabupaten_nama || null,
       kecamatan_nama: device.kecamatan_nama || null,
     }));
-  }, [publicDevices]);
+  }, [publicDevices, filters.selectedCity]);
 
   const latestRealtimeData = useMemo(() => {
     if (!publicDevices) return [];
 
-    return publicDevices
+    const selectedCityValue = normalizeRegionValue(filters.selectedCity);
+    const visibleDevices = !selectedCityValue
+      ? publicDevices
+      : publicDevices.filter((device) => {
+          const deviceCity = normalizeRegionValue(device.desa);
+          const deviceKabupaten = normalizeRegionValue(device.kabupaten_nama || device.kabupaten_id);
+          const deviceProvinsi = normalizeRegionValue(device.provinsi_nama || device.provinsi_id);
+
+          return (
+            deviceCity === selectedCityValue ||
+            deviceKabupaten === selectedCityValue ||
+            deviceProvinsi === selectedCityValue
+          );
+        });
+
+    return visibleDevices
       .filter((device) => !!device.latest_realtime?.timestamp_data)
       .map((device, index) => ({
         id: index + 1,
@@ -137,7 +222,7 @@ const FullMap: React.FC = () => {
         curah_hujan: device.latest_realtime.curah_hujan ?? Number.NaN,
         kelembapan: device.latest_realtime.kelembapan ?? Number.NaN,
       }));
-  }, [publicDevices]);
+  }, [publicDevices, filters.selectedCity]);
 
   useEffect(() => {
     if (!filters.selectedCity || filteredDevices.length === 0) {

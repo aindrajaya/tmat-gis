@@ -16,6 +16,16 @@ export interface PaginatedResponse<T> {
   limit: number;
 }
 
+export interface PublicMapDeviceFilters {
+  email: string;
+  role: 'admin' | 'perusahaan' | 'pemda';
+  provinsi?: string;
+  kabupaten?: string;
+  kecamatan?: string;
+  desa?: string;
+  jenis_perusahaan?: string;
+}
+
 export function getApiHost() {
   return getApiBaseUrl(getCurrentApiMode());
 }
@@ -304,10 +314,12 @@ export class APIClient {
     return this.request<PublicMapSummary>('/public/map/summary');
   }
 
-  async getPublicMapDevices(filters: Record<string, string>): Promise<PublicMapDevice[]> {
+  async getPublicMapDevices(filters: PublicMapDeviceFilters): Promise<PublicMapDevice[]> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) params.set(key, value);
+      if (typeof value === 'string' && value.trim()) {
+        params.set(key, value);
+      }
     });
     const query = params.toString();
     const response = await this.request<any>(`/public/map/devices${query ? `?${query}` : ''}`);

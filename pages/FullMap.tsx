@@ -1,8 +1,10 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import DashboardMap from '../components/DashboardMap';
 import ChartContainer from '../components/charts/ChartContainer';
 import { useHistoricalDataAllChunks, usePublicMapDevices, usePublicMapSummary } from '../services/useApi';
+import { PublicMapDeviceFilters } from '../services/apiClient';
 import { useFilters } from '../context/FilterContext';
 import { Device } from '../types';
 import { buildTmatChartSeries } from '../utils/tmatChartAggregation';
@@ -18,6 +20,7 @@ const normalizeRegionValue = (value?: string | null): string => {
 
 const FullMap: React.FC = () => {
   const { t } = useTranslation();
+  const location = useLocation();
   const { filters, updateFilter } = useFilters();
   const [chartView, setChartView] = useState<'daily' | 'weekly'>('daily');
   const publicFilterInitializedRef = useRef(false);
@@ -37,13 +40,38 @@ const FullMap: React.FC = () => {
     window.location.hash.startsWith('#/map/')
   );
 
-  const publicLocationFilters = useMemo(() => ({
-    provinsi: filters.provinsi || '',
-    kabupaten: filters.kabupaten || '',
-    kecamatan: filters.kecamatan || '',
-    desa: filters.desa || '',
-    jenis_perusahaan: filters.jenis_perusahaan || '',
-  }), [filters.provinsi, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan]);
+  const mapScopeFromQuery = useMemo((): Pick<PublicMapDeviceFilters, 'email' | 'role'> | null => {
+    const hashQuery = typeof window !== 'undefined' ? window.location.hash.split('?')[1] || '' : '';
+    const queryInput = location.search || hashQuery;
+    const query = new URLSearchParams(queryInput.startsWith('?') ? queryInput : '?' + queryInput);
+    const email = (query.get('email') || '').trim();
+    const roleParam = (query.get('role') || '').trim().toLowerCase();
+
+    if (!email || !roleParam) {
+      return null;
+    }
+
+    if (roleParam !== 'admin' && roleParam !== 'perusahaan' && roleParam !== 'pemda') {
+      return null;
+    }
+
+    return { email, role: roleParam };
+  }, [location.search]);
+
+  const publicLocationFilters = useMemo((): PublicMapDeviceFilters | null => {
+    if (!mapScopeFromQuery) {
+      return null;
+    }
+
+    return {
+      ...mapScopeFromQuery,
+      provinsi: filters.provinsi || '',
+      kabupaten: filters.kabupaten || '',
+      kecamatan: filters.kecamatan || '',
+      desa: filters.desa || '',
+      jenis_perusahaan: filters.jenis_perusahaan || '',
+    };
+  }, [mapScopeFromQuery, filters.provinsi, filters.kabupaten, filters.kecamatan, filters.desa, filters.jenis_perusahaan]);
 
   const {
     data: publicSummary,
@@ -220,6 +248,19 @@ const FullMap: React.FC = () => {
 
   const isLoading = summaryLoading || devicesLoading || historicalData.isLoading;
   const hasError = summaryError || devicesError || historicalData.error;
+
+  if (!mapScopeFromQuery) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="bg-white border border-amber-200 rounded-xl p-6 shadow-sm space-y-2 max-w-lg">
+          <h3 className="font-bold text-amber-800">Parameter map tidak valid</h3>
+          <p className="text-amber-700">
+            Gunakan format URL `#/map?email=user@email.com&role=admin|perusahaan|pemda`.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

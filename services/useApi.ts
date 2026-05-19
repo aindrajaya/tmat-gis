@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getAPIClient, APIClient } from './apiClient';
+import { getAPIClient, APIClient, PublicMapDeviceFilters } from './apiClient';
 import { Device, Perusahaan, PublicMapAnalytics, PublicMapDevice, PublicMapSummary, RealtimeData } from '../types';
 import { splitDateRangeIntoChunks, DateChunk } from '../utils/dateChunking';
 
@@ -211,13 +211,17 @@ export function usePublicMapSummary() {
   };
 }
 
-export function usePublicMapDevices(filters: Record<string, string>) {
+export function usePublicMapDevices(filters: PublicMapDeviceFilters | null) {
   const query = useQuery({
     queryKey: ['public-map-devices', filters],
     queryFn: async () => {
+      if (!filters) {
+        return [];
+      }
       const client = getAPIClient();
       return client.getPublicMapDevices(filters);
     },
+    enabled: !!filters,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });

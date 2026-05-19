@@ -40,10 +40,18 @@ jobs:
             # Copy nginx config
             cp docker/nginx.conf app/nginx.conf
 
-            # Rebuild and restart app with fresh image layers
+            # Resolve frontend service name from compose file
+            SERVICE_NAME="$(docker compose config --services | grep -E '^(vite-app|app|frontend)$' | head -n 1 || true)"
+            if [ -z "$SERVICE_NAME" ]; then
+              echo "No frontend service name matched (vite-app|app|frontend). Available services:"
+              docker compose config --services
+              exit 1
+            fi
+
+            # Rebuild and restart frontend service with fresh image layers
             docker compose down
-            docker compose build --no-cache --pull app
-            docker compose up -d --force-recreate app
+            docker compose build --no-cache --pull "$SERVICE_NAME"
+            docker compose up -d --force-recreate "$SERVICE_NAME"
 
             # Health check
             sleep 15
